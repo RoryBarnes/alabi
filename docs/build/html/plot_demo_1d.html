@@ -1,18 +1,18 @@
 <!doctype html>
 <html class="no-js" lang="en" data-content_root="./">
-  <head><meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Test 2D Benchmarks" href="plot_demo_2d.html" /><link rel="prev" title="Bayesian Optimization" href="plot_bayesian_optimization.html" />
-        <link rel="canonical" href="https://alabi.jessicabirky.com/plot_demo_1d.html" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Test 2D Benchmarks" href="plot_demo_2d.html"><link rel="prev" title="Automated Hyperparameter Selection" href="auto_hp_settings.html">
+        <link rel="canonical" href="https://alabi.jessicabirky.com/plot_demo_1d.html">
 
-    <!-- Generated with Sphinx 7.3.7 and Furo 2025.07.19 -->
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
         <title>Visualize Active Learning - alabi</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
-    <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=9c3e77be" />
     <link rel="stylesheet" type="text/css" href="_static/nbsphinx-code-cells.css?v=2aa19091" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     <link rel="stylesheet" type="text/css" href="_static/custom.css?v=0cf789f7" />
@@ -44,14 +44,14 @@
   }
   @media not print {
     body[data-theme="dark"] {
-      --color-code-background: #2b2b2b;
-  --color-code-foreground: #f8f8f2;
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
   
     }
     @media (prefers-color-scheme: dark) {
       body:not([data-theme="light"]) {
-        --color-code-background: #2b2b2b;
-  --color-code-foreground: #f8f8f2;
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
   
       }
     }
@@ -166,14 +166,10 @@
   </symbol>
 </svg>
 
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
-<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
-<label class="overlay sidebar-overlay" for="__navigation">
-  <div class="visually-hidden">Hide navigation sidebar</div>
-</label>
-<label class="overlay toc-overlay" for="__toc">
-  <div class="visually-hidden">Hide table of contents sidebar</div>
-</label>
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
 
 <a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
 
@@ -183,8 +179,7 @@
   <header class="mobile-header">
     <div class="header-left">
       <label class="nav-overlay-icon" for="__navigation">
-        <div class="visually-hidden">Toggle site navigation sidebar</div>
-        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
       </label>
     </div>
     <div class="header-center">
@@ -192,8 +187,7 @@
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
-        <button class="theme-toggle">
-          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
           <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
           <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
           <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
@@ -201,8 +195,7 @@
         </button>
       </div>
       <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
-        <div class="visually-hidden">Toggle table of contents sidebar</div>
-        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
   </header>
@@ -227,6 +220,7 @@
 <li class="toctree-l1"><a class="reference internal" href="gp_tutorial.html">GP Training</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mcmc_tutorial.html">MCMC sampling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plot_bayesian_optimization.html">Bayesian Optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_hp_settings.html">Automated Hyperparameter Selection</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Benchmark Examples</span></p>
 <ul class="current">
@@ -242,7 +236,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API</span></p>
 <ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="modules.html">alabi</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of alabi</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="modules.html">alabi</a><input aria-label="Toggle navigation of alabi" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="alabi.html">alabi package</a></li>
 </ul>
 </li>
@@ -278,8 +272,7 @@
   </a>
 </div>
 <div class="theme-toggle-container theme-toggle-content">
-            <button class="theme-toggle">
-              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
               <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
               <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
               <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
@@ -287,8 +280,7 @@
             </button>
           </div>
           <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
-            <div class="visually-hidden">Toggle table of contents sidebar</div>
-            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
@@ -327,19 +319,23 @@ Interactive online version:
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
 
 <span class="n">sm</span> <span class="o">=</span> <span class="n">SurrogateModel</span><span class="p">(</span><span class="n">lnlike_fn</span><span class="o">=</span><span class="n">test1d_fn</span><span class="p">,</span>
                     <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
-                    <span class="n">savedir</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;results/test1d&quot;</span><span class="p">,</span>
-                    <span class="n">theta_scaler</span><span class="o">=</span><span class="n">alabi</span><span class="o">.</span><span class="n">no_scaler</span><span class="p">,</span>
-                    <span class="n">y_scaler</span><span class="o">=</span><span class="n">alabi</span><span class="o">.</span><span class="n">no_scaler</span><span class="p">)</span>
+                    <span class="n">savedir</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;results/test1d&quot;</span><span class="p">)</span>
 
 <span class="n">sm</span><span class="o">.</span><span class="n">init_samples</span><span class="p">(</span><span class="n">ntrain</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">sampler</span><span class="o">=</span><span class="s2">&quot;sobol&quot;</span><span class="p">)</span>
-<span class="n">sm</span><span class="o">.</span><span class="n">init_gp</span><span class="p">(</span><span class="n">kernel</span><span class="o">=</span><span class="s2">&quot;ExpSquaredKernel&quot;</span><span class="p">,</span> <span class="n">fit_amp</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fit_mean</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">white_noise</span><span class="o">=-</span><span class="mi">12</span><span class="p">,</span> <span class="n">gp_scale_rng</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">sm</span><span class="o">.</span><span class="n">init_gp</span><span class="p">(</span><span class="n">kernel</span><span class="o">=</span><span class="s2">&quot;ExpSquaredKernel&quot;</span><span class="p">,</span>
+           <span class="n">fit_amp</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+           <span class="n">fit_mean</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+           <span class="n">white_noise</span><span class="o">=-</span><span class="mi">12</span><span class="p">,</span>
+           <span class="n">gp_scale_rng</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
+           <span class="n">theta_scaler</span><span class="o">=</span><span class="n">alabi</span><span class="o">.</span><span class="n">no_scaler</span><span class="p">,</span>
+           <span class="n">y_scaler</span><span class="o">=</span><span class="n">alabi</span><span class="o">.</span><span class="n">no_scaler</span><span class="p">)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">bape</span><span class="p">(</span><span class="n">xgrid</span><span class="p">):</span>
     <span class="k">return</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">ut</span><span class="o">.</span><span class="n">bape_utility</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="p">]),</span> <span class="n">sm</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="n">sm</span><span class="o">.</span><span class="n">gp</span><span class="p">,</span> <span class="n">sm</span><span class="o">.</span><span class="n">bounds</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xgrid</span><span class="p">])</span>
@@ -354,11 +350,31 @@ Interactive online version:
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Computed 6 function evaluations: 3.0s
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">AttributeError</span>                            Traceback (most recent call last)
+<span class="ansi-cyan-fg">Cell</span><span class="ansi-cyan-fg"> </span><span class="ansi-green-fg">In[4]</span><span class="ansi-green-fg">, line 8</span>
+<span class="ansi-green-fg">      3</span> sm = SurrogateModel(lnlike_fn=test1d_fn,
+<span class="ansi-green-fg">      4</span>                     bounds=bounds,
+<span class="ansi-green-fg">      5</span>                     savedir=<span class="ansi-yellow-fg">f</span><span class="ansi-yellow-fg">&#34;</span><span class="ansi-yellow-fg">results/test1d</span><span class="ansi-yellow-fg">&#34;</span>)
+<span class="ansi-green-fg">      7</span> sm.init_samples(ntrain=<span class="ansi-green-fg">6</span>, sampler=<span class="ansi-yellow-fg">&#34;</span><span class="ansi-yellow-fg">sobol</span><span class="ansi-yellow-fg">&#34;</span>)
+<span class="ansi-green-fg">----&gt; </span><span class="ansi-green-fg">8</span> <span class="ansi-yellow-bg">sm</span><span class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">init_gp</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">kernel</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-fg ansi-yellow-bg">&#34;</span><span class="ansi-yellow-fg ansi-yellow-bg">ExpSquaredKernel</span><span class="ansi-yellow-fg ansi-yellow-bg">&#34;</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span>
+<span class="ansi-green-fg">      9</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">fit_amp</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(0,135,0)">True</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span>
+<span class="ansi-green-fg">     10</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">fit_mean</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(0,135,0)">True</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span>
+<span class="ansi-green-fg">     11</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">white_noise</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">-</span><span class="ansi-green-fg ansi-yellow-bg">12</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span>
+<span class="ansi-green-fg">     12</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">gp_scale_rng</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg">-</span><span class="ansi-green-fg ansi-yellow-bg">1</span><span class="ansi-yellow-bg">,</span><span class="ansi-green-fg ansi-yellow-bg">1</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg">,</span>
+<span class="ansi-green-fg">     13</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">theta_scaler</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">alabi</span><span class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">no_scaler</span><span class="ansi-yellow-bg">,</span>
+<span class="ansi-green-fg">     14</span> <span class="ansi-yellow-bg">           </span><span class="ansi-yellow-bg">y_scaler</span><span class="ansi-yellow-bg">=</span><span class="ansi-yellow-bg">alabi</span><span class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">no_scaler</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-fg">     16</span> <span class="ansi-bold" style="color: rgb(0,135,0)">def</span><span style="color: rgb(188,188,188)"> </span><span class="ansi-blue-fg">bape</span>(xgrid):
+<span class="ansi-green-fg">     17</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">return</span> -np.array([ut.bape_utility(np.array([x]), sm._y, sm.gp, sm.bounds) <span class="ansi-bold" style="color: rgb(0,135,0)">for</span> x <span class="ansi-bold" style="color: rgb(175,0,255)">in</span> xgrid])
 
-Initialized GP with squared exponential kernel.
-Successfully initialized GP on attempt 1
-Optimized 4 hyperparameters: (0.016s)
+<span class="ansi-cyan-fg">File </span><span class="ansi-green-fg">~/Tresorit/packages/alabi/alabi/core.py:967</span>, in <span class="ansi-cyan-fg">SurrogateModel.init_gp</span><span class="ansi-blue-fg">(self, kernel, fit_amp, fit_mean, fit_white_noise, white_noise, gp_scale_rng, gp_amp_rng, uniform_scales, overwrite, theta_scaler, y_scaler, gp_opt_method, gp_nopt, optimizer_kwargs, hyperopt_method, regularize, amp_0, mu_0, sigma_0, cv_folds, cv_scoring, cv_n_candidates, cv_stage2_candidates, cv_stage2_width, cv_stage3_candidates, cv_stage3_width, cv_weighted_factor, multi_proc)</span>
+<span class="ansi-green-fg">    965</span> <span style="color: rgb(95,135,135)"># Save scaled training data for GP fitting</span>
+<span class="ansi-green-fg">    966</span> <span style="color: rgb(0,135,0)">self</span>._theta_test = <span style="color: rgb(0,135,0)">self</span>.theta_scaler.transform(<span style="color: rgb(0,135,0)">self</span>.theta_test)
+<span class="ansi-green-fg">--&gt; </span><span class="ansi-green-fg">967</span> <span style="color: rgb(0,135,0)">self</span>._y_test = <span style="color: rgb(0,135,0)">self</span>.y_scaler.transform(<span class="ansi-yellow-bg" style="color: rgb(0,135,0)">self</span><span class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">y_test</span><span class="ansi-yellow-bg">.</span><span class="ansi-yellow-bg">reshape</span>(-<span class="ansi-green-fg">1</span>, <span class="ansi-green-fg">1</span>)).flatten()
+<span class="ansi-green-fg">    968</span> <span style="color: rgb(0,135,0)">self</span>._theta_train = <span style="color: rgb(0,135,0)">self</span>._theta
+<span class="ansi-green-fg">    969</span> <span style="color: rgb(0,135,0)">self</span>._y_train = <span style="color: rgb(0,135,0)">self</span>._y
+
+<span class="ansi-red-fg">AttributeError</span>: &#39;list&#39; object has no attribute &#39;reshape&#39;
 </pre></div></div>
 </div>
 <p>Define a plot function for inspecting the current GP fit so that we can compare the fit before and after active learning training.</p>
@@ -618,14 +634,14 @@ Caching model to results/test1d/surrogate_model...
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="plot_bayesian_optimization.html">
+          <a class="prev-page" href="auto_hp_settings.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Bayesian Optimization</div>
+                <div class="title">Automated Hyperparameter Selection</div>
                 
               </div>
             </a>
@@ -654,8 +670,8 @@ Caching model to results/test1d/surrogate_model...
     </aside>
   </div>
 </div><script src="_static/documentation_options.js?v=d45e8c67"></script>
-    <script src="_static/doctools.js?v=9a2dae69"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
     <script src="_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="_static/copybutton.js?v=f281be69"></script>
@@ -663,12 +679,11 @@ Caching model to results/test1d/surrogate_model...
     <script>let toggleHintShow = 'Click to show';</script>
     <script>let toggleHintHide = 'Click to hide';</script>
     <script>let toggleOpenOnPrint = 'true';</script>
-    <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+    <script src="_static/togglebutton.js?v=1ae7504c"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
-    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/notebook-outputs.js?v=9bb603c3"></script>
     </body>
 </html>
