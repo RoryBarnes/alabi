@@ -47,11 +47,11 @@ $ k(x, x') = \sigma_f^2 \exp\left(-\frac{(x - x')^2}{2\ell^2}\right) $
 where $ k(x, x') $ is the kernel function, $ \sigma_f^2 $ is the  [hyperparameter](https://en.wikipedia.org/wiki/Hyperparameter_(machine_learning)'s amplitude, $ \ell $ is the length scale hyperparameter, and $ x $ and $ x' $ are input points.
 
 ```python
-sm.init_gp(kernel="ExpSquaredKernel", fit_amp=True, fit_mean=True, white_noise=None)
-```
-Then train the GP on an initial set of randomly selected training points
-```python
 sm.init_samples(ntrain=10)
+```
+Then initialize the GP surrogate model on those training points:
+```python
+sm.init_gp(kernel="ExpSquaredKernel", fit_amp=True, fit_mean=True, fit_white_noise=False)
 ```
 
 ### Step 5

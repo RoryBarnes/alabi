@@ -611,8 +611,8 @@ class SurrogateModel(object):
             self.ntest = len(theta_test)
         
         else:
-            self.theta_test = []
-            self.y_test = []
+            self.theta_test = np.empty((0, self.ndim))
+            self.y_test = np.empty(0)
             self.ntest = 0
 
         # Save initial training sample
@@ -867,11 +867,13 @@ class SurrogateModel(object):
             Should be smaller than cv_stage2_width for finer refinement.
             Only used when cv_three_stage=True.
 
-        :raises AssertionError: 
+        :raises RuntimeError:
+            If init_samples() has not been called before init_gp().
+        :raises AssertionError:
             If a GP already exists and overwrite=False.
-        :raises ValueError: 
+        :raises ValueError:
             If an invalid kernel name is provided.
-        :raises Exception: 
+        :raises Exception:
             If GP initialization fails after multiple attempts with different scale lengths.
 
         .. note:: 
@@ -897,6 +899,10 @@ class SurrogateModel(object):
             ...            optimizer_kwargs={"maxiter": 100, "ftol": 1e-9})
         """
         
+        if not hasattr(self, 'theta_train'):
+            raise RuntimeError(
+                "No training data found. Call init_samples() before init_gp().")
+
         if hasattr(self, 'gp') and (overwrite == False):
             raise AssertionError(
                 "GP kernel already assigned. Use overwrite=True to re-assign the kernel.")
