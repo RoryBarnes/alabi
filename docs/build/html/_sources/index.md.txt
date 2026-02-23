@@ -2,23 +2,23 @@
 :caption: Intro
 :hidden:
 
-quickstart
-save_reload
-gp_tutorial
-mcmc_tutorial
-plot_bayesian_optimization
-auto_hp_settings
+1_quickstart
+2_save_reload
+3_gp_tutorial
+4_mcmc_tutorial
+5_plot_bayesian_optimization
+6_auto_hp_settings
 ```
 
 ```{toctree}
 :caption: Benchmark Examples
 :hidden:
 
-plot_demo_1d
-plot_demo_2d
-plot_line_fit
-plot_kl_divergence
-plot_gaussian_nd
+7_plot_demo_1d
+8_plot_demo_2d
+9_plot_line_fit
+10_plot_kl_divergence
+11_plot_gaussian_nd
 ```
 
 ```{toctree}

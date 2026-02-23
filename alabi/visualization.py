@@ -13,11 +13,10 @@ from functools import partial
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import rc
-rc('text', usetex=True)
+rc('text', usetex=False)
 rc('xtick', labelsize=16)
 rc('ytick', labelsize=16)
-font = {'family' : 'normal',
-        'weight' : 'light'}
+font = {'weight' : 'light'}
 rc('font', **font)
 
 from dynesty import plotting as dyplot
@@ -291,7 +290,11 @@ def plot_true_fit_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=
 
 def plot_utility_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=None):
 
-    obj_fn = partial(sm.utility, y=sm._y, gp=sm.gp, bounds=sm._bounds)
+    predict_gp = lambda t: sm.gp.predict(sm._y, t, return_var=True)
+    if sm.algorithm == "jones":
+        obj_fn = partial(sm.utility, predict_gp=predict_gp, bounds=sm._bounds, y_best=np.max(sm._y))
+    else:
+        obj_fn = partial(sm.utility, predict_gp=predict_gp, bounds=sm._bounds)
 
     fig = plot_contour_2D(obj_fn, sm._bounds, sm.savedir, savename="objective_function.png", 
                     title=f"{sm.algorithm.upper()} function", ngrid=ngrid, cmap='Greens_r',
@@ -307,7 +310,7 @@ def plot_utility_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=N
 def plot_gp_fit_2D(sm, ngrid=60, title="GP fit", cmap="Blues_r", show=False, vmin=None, vmax=None, log_scale=False):
 
     theta = sm.theta() 
-    theta0 = sm.theta_scaler.inverse_transform(sm._theta0)
+    theta0 = sm.theta_scaler.inverse_transform(sm._theta[:sm.ninit_train])
 
     xarr = np.linspace(sm.bounds[0][0], sm.bounds[0][1], ngrid)
     yarr = np.linspace(sm.bounds[1][0], sm.bounds[1][1], ngrid)
@@ -318,7 +321,7 @@ def plot_gp_fit_2D(sm, ngrid=60, title="GP fit", cmap="Blues_r", show=False, vmi
     for i in range(Z.shape[0]):
         for j in range(Z.shape[1]):
             tt = np.array([X[i][j], Y[i][j]]).reshape(1,-1)
-            Z[i][j] = sm.surrogate_log_likelihood(tt)
+            Z[i][j] = float(np.squeeze(sm.surrogate_log_likelihood(tt)))
         
     fig = plt.figure()
     if log_scale:        

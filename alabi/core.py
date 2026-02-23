@@ -247,7 +247,7 @@ class SurrogateModel(object):
 
     def __init__(self, lnlike_fn=None, bounds=None, param_names=None, 
                  cache=True, savedir="results/", model_name="surrogate_model",
-                 verbose=True, ncore=1, pool_method="forkserver", ignore_warnings=True,
+                 verbose=True, show_warnings=False, ncore=1, pool_method="forkserver", ignore_warnings=True,
                  random_state=None):
 
         # Check all required inputs are specified
@@ -300,6 +300,7 @@ class SurrogateModel(object):
 
         # Print progress statements
         self.verbose = verbose
+        self.show_warnings = show_warnings
         
         # Ignore warnings
         if ignore_warnings:
@@ -465,13 +466,13 @@ class SurrogateModel(object):
         return _theta, _y
 
 
-    def init_train(self, nsample=None, sampler="uniform", fname="initial_training_sample.npz"):
+    def init_train(self, nsample=None, sampler="lhs", fname="initial_training_sample.npz"):
         """
         :param nsample: (*int, optional*) 
             Number of samples. Defaults to ``nsample = 50 * self.ndim``
 
         :param sampler: (*str, optional*) 
-            Sampling method. Defaults to ``'sobol'``. 
+            Sampling method. Defaults to ``'lhs'``. 
             See ``utility.prior_sampler`` for more details.
         """
 
@@ -582,7 +583,7 @@ class SurrogateModel(object):
                 print(f"Unable to reload {cache_file} due to error: {e}. Computing new samples with {self.ncore} cores...")
                 theta, y = self.init_train(nsample=ntrain, sampler=sampler, fname=train_file)
         else:
-            train_file="initial_train_file_sample.npz"
+            train_file = "initial_train_file_sample.npz"
             theta, y = self.init_train(nsample=ntrain, sampler=sampler, fname=train_file)
             
         # --------------------------------------------------------
@@ -900,6 +901,10 @@ class SurrogateModel(object):
         if hasattr(self, 'gp') and (overwrite == False):
             raise AssertionError(
                 "GP kernel already assigned. Use overwrite=True to re-assign the kernel.")
+
+        if not hasattr(self, "theta_train") or not hasattr(self, "y_train"):
+            raise AssertionError(
+                "Training data not found. Call init_samples() before init_gp().")
             
         # optional hyperparameter choices
         self.fit_amp = fit_amp
@@ -949,8 +954,9 @@ class SurrogateModel(object):
         self._theta, self._y = self.refit_scalers(self.theta_train, self.y_train)
         
         # Save scaled training data for GP fitting
-        self._theta_test = self.theta_scaler.transform(self.theta_test)
-        self._y_test = self.y_scaler.transform(self.y_test.reshape(-1, 1)).flatten()
+        if self.ntest > 0:
+            self._theta_test = self.theta_scaler.transform(self.theta_test)
+            self._y_test = self.y_scaler.transform(np.array(self.y_test).reshape(-1, 1)).flatten()
         self._theta_train = self._theta
         self._y_train = self._y
 
@@ -1145,8 +1151,9 @@ class SurrogateModel(object):
         if hyperparameters is not None:
             hyperparameters_array = np.atleast_1d(hyperparameters)
             if not np.all(np.isfinite(hyperparameters_array)):
-                print(f"Warning: Hyperparameters contain NaN or Inf: {hyperparameters_array}")
-                print("Reoptimizing hyperparameters from scratch...")
+                if self.show_warnings:
+                    print(f"Warning: Hyperparameters contain NaN or Inf: {hyperparameters_array}")
+                    print("Reoptimizing hyperparameters from scratch...")
                 gp, _ = self._opt_gp(**self.opt_gp_kwargs, _theta=_theta, _y=_y)
                 # Validate the reoptimized GP
                 reopt_params = gp.get_parameter_vector()
@@ -1233,6 +1240,64 @@ class SurrogateModel(object):
             use_gradient = True
 
         self.set_hyperparam_prior_bounds()
+
+        if hyperopt_method.lower() == "cv":
+            # Cross-validation hyperparameter optimization    
+            if self.verbose:
+                print(f"\nOptimizing GP hyperparameters using {cv_folds}-fold cross-validation...")
+            
+            try:                         
+                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=None)
+
+                # Add current hyperparameters as a candidate if GP exists
+                if hasattr(self, "gp"):
+                    candidates[0] = self.get_hyperparameter_vector(self.gp)
+                
+                # Expand hyperparameters if using uniform scales
+                # CV function expects full parameter vectors that can be set directly on GP
+                if self.uniform_scales:
+                    candidates_expanded = np.array([self.expand_hyperparameter_vector(c) for c in candidates])
+                else:
+                    candidates_expanded = candidates
+                     
+                # suppress outputs if running parallel chains   
+                if multi_proc:
+                    verbose_cv = False  # Suppress for parallel chains
+                else:
+                    verbose_cv = True  # Always show CV diagnostics
+                
+                # Optimize using cross-validation
+                pool = self._get_pool(ncore=self.ncore) if multi_proc else None
+                op_gp = gp_utils.optimize_gp_kfold_cv(
+                    self.gp, _theta, _y,
+                    candidates_expanded,
+                    self.y_scaler,
+                    k_folds=cv_folds,
+                    scoring=cv_scoring,
+                    pool=pool,
+                    stage2_candidates=cv_stage2_candidates,
+                    stage2_width=cv_stage2_width,
+                    stage3_candidates=cv_stage3_candidates,
+                    stage3_width=cv_stage3_width,
+                    weighted_mse_method=cv_weighted_mse_method,
+                    weighted_mse_factor=cv_weighted_factor,
+                    verbose=verbose_cv
+                )
+                self._close_pool(pool)
+                
+            except Exception as e:
+                import traceback
+                import sys
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                tb_line = traceback.extract_tb(exc_traceback)[-1]
+                if self.show_warnings:
+                    print(f"Warning: CV hyperparameter optimization failed: {str(e)}")
+                    print(f"Error at line {tb_line.lineno} in {tb_line.filename}: {tb_line.line}")
+                    print("Falling back to maximum likelihood optimization...")
+                
+                # Fall back to ML optimization if CV fails
+                op_gp = None
+                hyperopt_method = "ml"
             
         if hyperopt_method.lower() == "ml":
             current_gp = self.gp
@@ -1326,61 +1391,6 @@ class SurrogateModel(object):
                     print(f"Final -logL: \t {nll_fit:.4f} | \t Regularization: None ")
                 print(f"{results.nit} iterations | Success: {results.success} | Message: {results.message} \n")
 
-        if hyperopt_method.lower() == "cv":
-            # Cross-validation hyperparameter optimization    
-            if self.verbose:
-                print(f"\nOptimizing GP hyperparameters using {cv_folds}-fold cross-validation...")
-            
-            try:                         
-                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=None)
-
-                # Add current hyperparameters as a candidate if GP exists
-                if hasattr(self, "gp"):
-                    candidates[0] = self.get_hyperparameter_vector(self.gp)
-                
-                # Expand hyperparameters if using uniform scales
-                # CV function expects full parameter vectors that can be set directly on GP
-                if self.uniform_scales:
-                    candidates_expanded = np.array([self.expand_hyperparameter_vector(c) for c in candidates])
-                else:
-                    candidates_expanded = candidates
-                     
-                # suppress outputs if running parallel chains   
-                if multi_proc:
-                    verbose_cv = False  # Suppress for parallel chains
-                else:
-                    verbose_cv = True  # Always show CV diagnostics
-                
-                # Optimize using cross-validation
-                pool = self._get_pool(ncore=self.ncore) if multi_proc else None
-                op_gp = gp_utils.optimize_gp_kfold_cv(
-                    self.gp, _theta, _y,
-                    candidates_expanded,
-                    self.y_scaler,
-                    k_folds=cv_folds,
-                    scoring=cv_scoring,
-                    pool=pool,
-                    stage2_candidates=cv_stage2_candidates,
-                    stage2_width=cv_stage2_width,
-                    stage3_candidates=cv_stage3_candidates,
-                    stage3_width=cv_stage3_width,
-                    weighted_mse_method=cv_weighted_mse_method,
-                    weighted_mse_factor=cv_weighted_factor,
-                    verbose=verbose_cv
-                )
-                self._close_pool(pool)
-                
-            except Exception as e:
-                import traceback
-                import sys
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                tb_line = traceback.extract_tb(exc_traceback)[-1]
-                print(f"Warning: CV hyperparameter optimization failed: {str(e)}")
-                print(f"Error at line {tb_line.lineno} in {tb_line.filename}: {tb_line.line}")
-                print("Falling back to maximum likelihood optimization...")
-                
-                # Fall back to ML optimization if CV fails
-                op_gp = None
 
         # If op_gp is not set (CV failed or wasn't used), use current GP or initialize one
         if 'op_gp' not in locals() or op_gp is None:
@@ -1597,9 +1607,18 @@ class SurrogateModel(object):
         """
 
         opt_timing_0 = time.time()
-        
-        predict_gp = lambda _theta_xs: self.gp.predict(self._y, _theta_xs, return_var=True)
-        
+
+        # Safe GP prediction wrapper: if the kernel matrix is non-PD (e.g. after a bad
+        # hyperparameter optimisation step), return zero mean and large variance so that
+        # the acquisition function degrades gracefully to exploration-only behaviour
+        # instead of raising an unhandled LinAlgError.
+        def predict_gp(_theta_xs):
+            try:
+                return self.gp.predict(self._y, _theta_xs, return_var=True)
+            except Exception:
+                n = _theta_xs.shape[0] if hasattr(_theta_xs, 'shape') else 1
+                return np.zeros(n), np.ones(n) * 1e10
+
         # Create objective function with appropriate parameters for different algorithms
         if self.algorithm == "jones":
             # Jones (Expected Improvement) requires y_best parameter
@@ -1625,19 +1644,22 @@ class SurrogateModel(object):
                                         method=self.obj_opt_method,
                                         options=optimizer_kwargs,
                                         grad_obj_fn=grad_obj_fn,
-                                        pool=None)
+                                        pool=None,
+                                        show_warnings=self.show_warnings)
 
         opt_timing = time.time() - opt_timing_0
         # self.training_results["acquisition_optimizer_niter"].append(opt_result.nit)
         
         # Validate optimization result
         if not np.all(np.isfinite(_thetaN)):
-            print(f"Warning: Acquisition function optimization failed. Falling back to random sampling.")
+            if self.show_warnings:
+                current_iter = self.training_results["iteration"][-1] if len(self.training_results["iteration"]) > 0 else 0
+                print(f"Warning: Acquisition function optimization failed at iteration {current_iter}. Falling back to random sampling.")
             # Fall back to random sampling from prior
             _thetaN = self._prior_sampler(nsample=1).flatten()
         
         thetaN = self.theta_scaler.inverse_transform(_thetaN.reshape(1, -1))
-        yN = self.true_log_likelihood(thetaN.reshape(-1,1))
+        yN = np.atleast_1d(self.true_log_likelihood(thetaN.flatten()))
         
         # Validate new training point
         if not np.any(np.isfinite(thetaN.flatten())):
@@ -1770,15 +1792,27 @@ class SurrogateModel(object):
             success = False
             while not success and attempts < max_attempts:
 
-                # Find next training point! (always single-threaded)
-                _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
-                
+                # Initialize to None so they are always defined after the loop
+                _theta_prop, _y_prop = None, None
+
+                try:
+                    # Find next training point! (always single-threaded)
+                    _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
+                except Exception as e:
+                    if self.show_warnings:
+                        print(f"Warning: find_next_point raised exception at iteration {ii}: {e}. Retrying.")
+
                 if _theta_prop is None or _y_prop is None:
                     attempts += 1
                 else:
-                    # Fit GP with new training point
-                    self.gp, fit_gp_timing = self._fit_gp(_theta=_theta_prop, _y=_y_prop, hyperparameters=self.gp.get_parameter_vector())
-                    success = True
+                    try:
+                        # Fit GP with new training point
+                        self.gp, fit_gp_timing = self._fit_gp(_theta=_theta_prop, _y=_y_prop, hyperparameters=self.gp.get_parameter_vector())
+                        success = True
+                    except Exception as e:
+                        if self.show_warnings:
+                            print(f"Warning: GP fit failed at iteration {ii}: {e}. Retrying with new point.")
+                        attempts += 1
 
                 if attempts >= max_attempts:
                     raise RuntimeError(f"Failed to find a valid training point after {max_attempts} attempts. \
@@ -1793,8 +1827,16 @@ class SurrogateModel(object):
 
                 reopt_kwargs = self.opt_gp_kwargs.copy()
                 reopt_kwargs["multi_proc"] = allow_opt_multiproc
-                # re-optimize hyperparamters
-                self.gp, _ = self._opt_gp(**reopt_kwargs)
+                # Save current params in case optimization leads to non-PD kernel
+                prev_params = self.gp.get_parameter_vector()
+                try:
+                    self.gp, _ = self._opt_gp(**reopt_kwargs)
+                    # Validate GP is still usable after optimization
+                    self.gp.predict(self._y, self._theta, return_cov=False)
+                except Exception as e:
+                    if self.show_warnings:
+                        print(f"Warning: GP re-optimization at iteration {ii + first_iter} produced invalid GP: {e}. Reverting hyperparameters.")
+                    self.gp.set_parameter_vector(prev_params)
                 
                 # record which iteration hyperparameters were optimized
                 self.training_results["gp_hyperparameter_opt_iteration"].append(ii + first_iter)
@@ -1818,7 +1860,8 @@ class SurrogateModel(object):
                 if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                     print("Train MSE:", training_mse)
             except Exception as e:
-                print(f"Warning: Error evaluating GP training error at iteration {ii + first_iter}: {e}")
+                if self.show_warnings:
+                    print(f"Warning: Error evaluating GP training error at iteration {ii + first_iter}: {e}")
                 training_mse = np.nan
                 training_scaled_mse = np.nan
 
@@ -1835,7 +1878,8 @@ class SurrogateModel(object):
                     if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                         print("Test MSE:", test_mse)
                 except Exception as e:
-                    print(f"Warning: Error evaluating GP test error at iteration {ii + first_iter}: {e}")
+                    if self.show_warnings:
+                        print(f"Warning: Error evaluating GP test error at iteration {ii + first_iter}: {e}")
                     test_mse = np.nan
                     test_scaled_mse = np.nan
             else:
@@ -2365,7 +2409,8 @@ class SurrogateModel(object):
         # Combine all chains and compute overall statistics
         if len(all_chains) > 1:
             self.emcee_samples = np.vstack(all_chains)
-            print(f"\nCombined {len(all_chains)} runs into {self.emcee_samples.shape[0]} total samples")
+            if self.verbose:
+                print(f"\nCombined {len(all_chains)} runs into {self.emcee_samples.shape[0]} total samples")
         else:
             self.emcee_samples = all_chains[0]
         
