@@ -500,14 +500,14 @@ class SurrogateModel(object):
         # close init_train pool
         self._close_pool(pool)
         
-        # replace any nan or inf values 
+        # replace any nan or inf values
         for ii in range(len(y)):
             if np.isnan(y[ii]) or np.isinf(y[ii]):
                 ynan = True
                 while ynan == True:
                     # resample theta
-                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=None)
-                    y[ii] = self.true_log_likelihood(new_theta).reshape(-1, 1)
+                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=None).flatten()
+                    y[ii, 0] = float(self.true_log_likelihood(new_theta))
                     theta[ii] = new_theta
                     if not (np.isnan(y[ii]) or np.isinf(y[ii])):
                         ynan = False
@@ -1648,14 +1648,14 @@ class SurrogateModel(object):
             _thetaN = self._prior_sampler(nsample=1).flatten()
         
         thetaN = self.theta_scaler.inverse_transform(_thetaN.reshape(1, -1))
-        yN = self.true_log_likelihood(thetaN.reshape(-1,1))
-        
+        yN = self.true_log_likelihood(thetaN.flatten())
+
         # Validate new training point
         if not np.any(np.isfinite(thetaN.flatten())):
             print(f"New theta contains NaN or Inf: {thetaN}")
             return None, None, opt_timing
-        if not np.any(np.isfinite(yN.flatten())):
-            print(f"New y value is NaN or Inf: {yN}. Check your likelihood function at theta={thetaN}") 
+        if not np.isfinite(float(yN)):
+            print(f"New y value is NaN or Inf: {yN}. Check your likelihood function at theta={thetaN}")
             return None, None, opt_timing
         
         # add theta and y to training samples
@@ -2319,12 +2319,13 @@ class SurrogateModel(object):
         all_run_times = []
         accumulated_samples = 0
         run_number = 1
-        
-        while accumulated_samples < min_ess:
+        iMinSamples = max(min_ess, 1)
+
+        while accumulated_samples < iMinSamples:
             if min_ess > 0:
-                print(f"\nRun {run_number}: Need {max(0, min_ess - accumulated_samples)} more samples...")
+                print(f"\nRun {run_number}: Need {max(0, iMinSamples - accumulated_samples)} more samples...")
                 print("="*50)
-            
+
             # Run the sampler!
             emcee_t0 = time.time()
             self.emcee_sampler = emcee.EnsembleSampler(self.nwalkers, 
@@ -2354,15 +2355,15 @@ class SurrogateModel(object):
             
             current_nsamples = current_samples.shape[0]
             accumulated_samples += current_nsamples
-            
+
             if min_ess > 0:
                 print(f"Run {run_number} complete: {current_nsamples} samples")
                 print(f"Total accumulated samples: {accumulated_samples}")
-            
+
             # If min_ess requirement met, break
-            if accumulated_samples >= min_ess:
+            if accumulated_samples >= iMinSamples:
                 break
-                
+
             run_number += 1
             
             # Reset initial positions for next run (start from end of previous run)
@@ -2395,7 +2396,10 @@ class SurrogateModel(object):
 
         # get acceptance fraction and autocorrelation time
         self.acc_frac = np.mean(self.emcee_sampler.acceptance_fraction)
-        self.autcorr_time = np.mean(self.emcee_sampler.get_autocorr_time())
+        try:
+            self.autcorr_time = np.mean(self.emcee_sampler.get_autocorr_time())
+        except Exception:
+            self.autcorr_time = np.mean(self.emcee_sampler.get_autocorr_time(quiet=True))
         if self.verbose:
             print(f"Total samples: {self.emcee_samples.shape[0]}")
             print("Mean acceptance fraction: {0:.3f}".format(self.acc_frac))
@@ -2651,11 +2655,15 @@ class SurrogateModel(object):
         else:
             raise ValueError(f"mode {mode} is not a valid option. Choose 'dynamic' or 'static'.")
         
-        # set up run kwargs. default: 100% weight on posterior, 0% evidence
-        default_run_kwargs = {"wt_kwargs": {'pfrac': 1.0},
-                              "stop_kwargs": {'pfrac': 1.0},
-                              "maxiter": int(5e4),
-                              "dlogz_init": 0.5}
+        # set up run kwargs with mode-appropriate defaults
+        if mode == "dynamic":
+            default_run_kwargs = {"wt_kwargs": {'pfrac': 1.0},
+                                  "stop_kwargs": {'pfrac': 1.0},
+                                  "maxiter": int(5e4),
+                                  "dlogz_init": 0.5}
+        else:
+            default_run_kwargs = {"maxiter": int(5e4),
+                                  "dlogz": 0.5}
         for key in default_run_kwargs:
             if key not in run_kwargs:
                 run_kwargs[key] = default_run_kwargs[key]
@@ -2670,15 +2678,16 @@ class SurrogateModel(object):
         all_run_times = []
         accumulated_samples = 0
         run_number = 1
-        
-        while accumulated_samples < min_ess:
+        iMinSamples = max(min_ess, 1)
+
+        while accumulated_samples < iMinSamples:
             if min_ess > 0:
-                print(f"\nRun {run_number}: Need {max(0, min_ess - accumulated_samples)} more samples...")
+                print(f"\nRun {run_number}: Need {max(0, iMinSamples - accumulated_samples)} more samples...")
                 print("="*50)
-            
+
             # Set timing for this run
             run_start_time = dynesty_t0 if run_number == 1 else time.time()
-            
+
             # Pickle sampler?
             if save_iter is not None:
                 run_sampler = True
@@ -2727,11 +2736,11 @@ class SurrogateModel(object):
                 print(f"Total accumulated samples: {accumulated_samples}")
             
             # If min_ess requirement met, break
-            if accumulated_samples >= min_ess:
+            if accumulated_samples >= iMinSamples:
                 break
-                
+
             run_number += 1
-            
+
             # Setup for next run
             if run_number <= 10:  # Limit to prevent infinite loops
                 # Create a new sampler for the next run
