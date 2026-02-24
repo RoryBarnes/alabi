@@ -910,6 +910,11 @@ class SurrogateModel(object):
         # optional hyperparameter choices
         self.fit_amp = fit_amp
         self.fit_mean = fit_mean
+        if white_noise is None and fit_white_noise:
+            raise ValueError(
+                "white_noise cannot be None when fit_white_noise=True. "
+                "Either set fit_white_noise=False or provide a numeric "
+                "white_noise value (default is -12).")
         self.fit_white_noise = fit_white_noise
         self.white_noise = white_noise
         self.uniform_scales = uniform_scales
@@ -1090,7 +1095,7 @@ class SurrogateModel(object):
         # Optimize GP hyperparameters
         self.gp, _ = self._opt_gp(**self.opt_gp_kwargs)
         
-        if hasattr(self, "_theta_test") & hasattr(self, "_y_test"):
+        if hasattr(self, "_theta_test") and hasattr(self, "_y_test") and len(self._y_test) > 0:
             _ytest = self.gp.predict(self._y, self._theta_test, return_cov=False, return_var=False)
             ytest = self.y_scaler.inverse_transform(_ytest.reshape(-1, 1)).flatten()
             ytest_true = self.y_scaler.inverse_transform(self._y_test.reshape(-1, 1)).flatten()
@@ -1829,7 +1834,7 @@ class SurrogateModel(object):
                 training_scaled_mse = np.nan
 
             # evaluate gp test error (scaled)
-            if hasattr(self, '_theta_test') and hasattr(self, '_y_test'):
+            if hasattr(self, '_theta_test') and hasattr(self, '_y_test') and len(self._y_test) > 0:
                 try:
                     _ytest = self.gp.predict(self._y, self._theta_test, return_cov=False, return_var=False)
                     ytest = self.y_scaler.inverse_transform(_ytest.reshape(-1, 1)).flatten()
