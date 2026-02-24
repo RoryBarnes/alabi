@@ -109,10 +109,10 @@ def patch_notebook_inplace(notebook_path):
             cell['source'] = new_source
             modified = True
 
-        # Collapse output for cells tagged with # docs: collapse output
+        # Clear output for cells tagged with # docs: collapse output
         source_text = ''.join(source) if isinstance(source, list) else source
-        if '# docs: collapse output' in source_text:
-            cell.setdefault('metadata', {})['collapsed'] = True
+        if '# docs: collapse output' in source_text and cell.get('outputs'):
+            cell['outputs'] = []
             modified = True
 
     if modified:

@@ -203,7 +203,7 @@ for settings in variable_settings:
 # **Note:** This can take several minutes depending on the number of combinations and problem dimensionality. Use `try/except` to handle configurations that fail to converge.
 
 # %%
-# docs: collapse ouput
+# docs: collapse output
 
 for ii in range(len(setting_combos)):
 
@@ -251,7 +251,7 @@ best_gp_results
 # - `nopt`: Number of optimization restarts for acquisition function
 
 # %%
-# docs: collapse ouput
+# docs: collapse output
 
 best_gp_kwargs = best_gp_results[gp_kwargs.keys()].to_dict(orient="records")[0]
 
@@ -297,7 +297,7 @@ plt.show()
 # Let's do a trial where we do 10 attempts with the same hyperparameter configuration and track the test mse:
 
 # %%
-# docs: collapse ouput
+# docs: collapse output
 
 best_gp_kwargs = best_gp_results[gp_kwargs.keys()].to_dict(orient="records")[0]
 
@@ -344,7 +344,7 @@ plt.show()
 # How do the other top initial fits perform during active learning?
 
 # %%
-# docs: collapse ouput
+# docs: collapse output
 
 al_kwargs = {"algorithm": "bape", 
 
