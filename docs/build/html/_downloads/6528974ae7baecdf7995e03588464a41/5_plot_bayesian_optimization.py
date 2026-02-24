@@ -29,6 +29,14 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+
+
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
+
 # %% [markdown]
 # ## Define the Multimodal Test Function
 # 

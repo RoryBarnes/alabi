@@ -214,8 +214,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Intro</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html#Quickstart-Example">Quickstart Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation + Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="2_save_reload.html">Saving and Reloading</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">GP Training</a></li>
 <li class="toctree-l1"><a class="reference internal" href="4_mcmc_tutorial.html">MCMC sampling</a></li>
@@ -298,6 +297,10 @@ Interactive online version:
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%</span><span class="k">matplotlib</span> inline
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">alabi</span><span class="w"> </span><span class="kn">import</span> <span class="n">SurrogateModel</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">rcParams</span>
+<span class="c1"># rcParams[&#39;font.family&#39;] = &#39;serif&#39;</span>
+<span class="c1"># rcParams[&#39;text.usetex&#39;] = True</span>
 </pre></div>
 </div>
 </div>
@@ -377,7 +380,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-np.float64(6.8220700139342965)
+np.float64(0.32818955109651066)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -408,7 +411,7 @@ Running 100 active learning iterations using bape...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 19%|█▉        | 19/100 [00:00&lt;00:00, 87.04it/s]
+ 18%|█▊        | 18/100 [00:00&lt;00:01, 79.65it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -426,7 +429,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 37%|███▋      | 37/100 [00:00&lt;00:01, 42.18it/s]
+ 34%|███▍      | 34/100 [00:01&lt;00:02, 30.14it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -434,8 +437,8 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 4.6342167424309304e-07
-Test MSE: 0.1295268868084218
+Train MSE: 0.08615299445103249
+Test MSE: 0.22178853386779387
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -446,7 +449,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 52%|█████▏    | 52/100 [00:01&lt;00:01, 32.44it/s]
+ 47%|████▋     | 47/100 [00:01&lt;00:02, 21.99it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -454,11 +457,8 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 1.3574266973530758e-06
-Test MSE: 0.0070693550632430725
-
-Optimizing GP hyperparameters using 5-fold cross-validation...
-Evaluating 100 hyperparameter candidates using 5-fold CV...
+Train MSE: 0.01934942381426072
+Test MSE: 0.06208639794078116
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -466,24 +466,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 67%|██████▋   | 67/100 [00:02&lt;00:01, 27.98it/s]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Train MSE: 2.323816754485977e-06
-Test MSE: 0.0027801061952519427
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
- 75%|███████▌  | 75/100 [00:02&lt;00:00, 34.66it/s]
+ 54%|█████▍    | 54/100 [00:02&lt;00:01, 27.94it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -501,7 +484,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 89%|████████▉ | 89/100 [00:02&lt;00:00, 28.46it/s]
+ 67%|██████▋   | 67/100 [00:02&lt;00:01, 20.47it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -509,8 +492,8 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 6.454014505836792e-07
-Test MSE: 0.0010292336044418723
+Train MSE: 0.025494906994286665
+Test MSE: 0.07754018588855627
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -518,7 +501,7 @@ Test MSE: 0.0010292336044418723
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 96%|█████████▌| 96/100 [00:03&lt;00:00, 33.95it/s]
+ 74%|███████▍  | 74/100 [00:03&lt;00:00, 26.28it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -536,7 +519,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-100%|██████████| 100/100 [00:03&lt;00:00, 27.64it/s]
+ 87%|████████▋ | 87/100 [00:03&lt;00:00, 20.10it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -544,8 +527,43 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 2.0963096229910406e-07
-Test MSE: 0.0016617907338259887
+Train MSE: 0.016752004784284708
+Test MSE: 0.06171883705728568
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+ 94%|█████████▍| 94/100 [00:04&lt;00:00, 25.57it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+Optimizing GP hyperparameters using 5-fold cross-validation...
+Evaluating 100 hyperparameter candidates using 5-fold CV...
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+100%|██████████| 100/100 [00:05&lt;00:00, 19.80it/s]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Train MSE: 0.005139916256407242
+Test MSE: 0.025767640519879953
 Caching model to results/rosenbrock_2d/surrogate_model...
 </pre></div></div>
 </div>
@@ -578,7 +596,7 @@ Caching model to results/rosenbrock_2d/surrogate_model...
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 True log-likelihood at [0. 0.]: -0.01
-Surrogate log-likelihood at [0. 0.]: -0.00995094062537305
+Surrogate log-likelihood at [0. 0.]: 0.011069081707745454
 </pre></div></div>
 </div>
 </section>

@@ -50,7 +50,17 @@ from itertools import product
 
 
 
-np.random.seed(101)
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
+
+
+
+random_state = 101
+
+np.random.seed(random_state)
 
 # %% [markdown]
 # ### Step 2: Define Problem and Base Configuration
@@ -114,11 +124,13 @@ sm = SurrogateModel(lnlike_fn=bm.eggbox["fn"],
 
                     pool_method="forkserver",
 
-                    verbose=True)
+                    verbose=True,
+
+                    random_state=random_state)
 
 
 
-sm.init_samples(ntrain=ninit, ntest=1000, sampler="sobol")
+sm.init_samples(ntrain=ninit, ntest=1000, sampler="lhs")
 
 # %% [markdown]
 # ### Step 3: Create Hyperparameter Grid
@@ -191,6 +203,8 @@ for settings in variable_settings:
 # **Note:** This can take several minutes depending on the number of combinations and problem dimensionality. Use `try/except` to handle configurations that fail to converge.
 
 # %%
+# docs: collapse ouput
+
 for ii in range(len(setting_combos)):
 
     try:
@@ -237,6 +251,8 @@ best_gp_results
 # - `nopt`: Number of optimization restarts for acquisition function
 
 # %%
+# docs: collapse ouput
+
 best_gp_kwargs = best_gp_results[gp_kwargs.keys()].to_dict(orient="records")[0]
 
 
@@ -276,9 +292,60 @@ plt.xlim(0, sm.nactive)
 plt.show()
 
 # %% [markdown]
+# How much does random variance affect the performance?
+# 
+# Let's do a trial where we do 10 attempts with the same hyperparameter configuration and track the test mse:
+
+# %%
+# docs: collapse ouput
+
+best_gp_kwargs = best_gp_results[gp_kwargs.keys()].to_dict(orient="records")[0]
+
+
+
+test_mse_trials = []
+
+for ii in range(10):
+
+    al_kwargs = {"algorithm": "bape", 
+
+                "gp_opt_freq": 20, 
+
+                "obj_opt_method": "nelder-mead", 
+
+                "nopt": 6}
+
+
+
+    sm.init_gp(**best_gp_kwargs, overwrite=True)
+
+    sm.active_train(niter=200, **al_kwargs)
+
+    test_mse_trials.append(sm.training_results["test_mse"])
+
+# %%
+for test_mse in test_mse_trials:
+
+    plt.plot(sm.training_results["iteration"], test_mse, color="C0", alpha=0.5)
+
+for ii in range(0, sm.nactive, sm.gp_opt_freq+1):
+
+    plt.axvline(ii, color="gray", linestyle="--", alpha=0.5)
+
+plt.xlabel("Iteration", fontsize=18)
+
+plt.ylabel("Test MSE", fontsize=18)
+
+plt.xlim(0, sm.nactive)
+
+plt.show()
+
+# %% [markdown]
 # How do the other top initial fits perform during active learning?
 
 # %%
+# docs: collapse ouput
+
 al_kwargs = {"algorithm": "bape", 
 
              "gp_opt_freq": 20, 
@@ -325,6 +392,9 @@ plt.show()
 
 
 top_fits
+
+# %% [markdown]
+# Here we see that the configuration for best initial fit isn't always necessarily the best fit after running active learning, but it is not a bad place to start. In practice, if the test error is not converging, it may be an indication to try a different configuration of hyperparameters.
 
 # %% [markdown]
 # ### Next Steps

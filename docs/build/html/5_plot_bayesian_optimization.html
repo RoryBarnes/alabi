@@ -214,8 +214,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Intro</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html#Quickstart-Example">Quickstart Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation + Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="2_save_reload.html">Saving and Reloading</a></li>
 <li class="toctree-l1"><a class="reference internal" href="3_gp_tutorial.html">GP Training</a></li>
 <li class="toctree-l1"><a class="reference internal" href="4_mcmc_tutorial.html">MCMC sampling</a></li>
@@ -295,7 +294,7 @@ Interactive online version:
 <h2>Import Libraries<a class="headerlink" href="#Import-Libraries" title="Link to this heading">¶</a></h2>
 <p>First, let’s import the necessary libraries:</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -303,6 +302,10 @@ Interactive online version:
 <span class="kn">from</span><span class="w"> </span><span class="nn">alabi.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">SurrogateModel</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">rcParams</span>
+<span class="c1"># rcParams[&#39;font.family&#39;] = &#39;serif&#39;</span>
+<span class="c1"># rcParams[&#39;text.usetex&#39;] = True</span>
 </pre></div>
 </div>
 </div>
@@ -311,7 +314,7 @@ Interactive online version:
 <h2>Define the Multimodal Test Function<a class="headerlink" href="#Define-the-Multimodal-Test-Function" title="Link to this heading">¶</a></h2>
 <p>We’ll use a 1D multimodal function with multiple local maxima. This function combines a sine wave with a Gaussian peak to create an interesting optimization landscape:</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[31]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">multimodal_function</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
@@ -345,7 +348,7 @@ Interactive online version:
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[32]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Visualize the function</span>
@@ -376,7 +379,7 @@ True global maximum at x=-0.712 with f(x)=3.573
 <h2>Set up the Surrogate Model<a class="headerlink" href="#Set-up-the-Surrogate-Model" title="Link to this heading">¶</a></h2>
 <p>Now we’ll create a SurrogateModel using alabi. For optimization, we want to maximize the function, but alabi works with log-likelihood functions (which we typically want to maximize). So we’ll use our function directly as the “log-likelihood”.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[40]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define bounds for the parameter space</span>
@@ -398,7 +401,7 @@ True global maximum at x=-0.712 with f(x)=3.573
 <h2>Initialize Training Set<a class="headerlink" href="#Initialize-Training-Set" title="Link to this heading">¶</a></h2>
 <p>Start with a small set of initial training points. First we’ll try training <code class="docutils literal notranslate"><span class="pre">alabi</span></code> with the default GP settings (using the squared exponential kernel and log-length scales ranging [-2,2]).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[41]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize with a few random points</span>
@@ -431,7 +434,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[42]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">xpred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
@@ -470,7 +473,7 @@ True global maximum at x=-0.712 with f(x)=3.573
 <h2>Run Bayesian Optimization with Jones Algorithm<a class="headerlink" href="#Run-Bayesian-Optimization-with-Jones-Algorithm" title="Link to this heading">¶</a></h2>
 <p>The Jones algorithm (Expected Improvement) is designed for optimization. It balances exploration (uncertainty) with exploitation (improving the current best).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[43]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run active learning with Jones algorithm</span>
@@ -514,7 +517,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 17%|█▋        | 5/30 [00:00&lt;00:02,  9.16it/s]
+ 17%|█▋        | 5/30 [00:00&lt;00:02,  8.46it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -522,7 +525,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 2.312027828911634e-10
+Train MSE: 3.183613129229024e-10
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -533,7 +536,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 33%|███▎      | 10/30 [00:01&lt;00:02,  9.41it/s]
+ 33%|███▎      | 10/30 [00:01&lt;00:02,  8.96it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -541,7 +544,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 4.5777532562913983e-10
+Train MSE: 2.202458513687688e-08
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -552,7 +555,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 50%|█████     | 15/30 [00:01&lt;00:01,  9.60it/s]
+ 50%|█████     | 15/30 [00:01&lt;00:01,  9.18it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -560,7 +563,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 1.7902188741538272e-16
+Train MSE: 5.730703548005629e-10
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -571,7 +574,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 67%|██████▋   | 20/30 [00:02&lt;00:01,  9.67it/s]
+ 67%|██████▋   | 20/30 [00:02&lt;00:01,  9.20it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -579,7 +582,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 3.763406959724759e-15
+Train MSE: 5.327356039977324e-10
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -590,7 +593,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
- 83%|████████▎ | 25/30 [00:02&lt;00:00,  9.58it/s]
+ 83%|████████▎ | 25/30 [00:02&lt;00:00,  9.27it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -598,7 +601,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 3.0238955234575616e-13
+Train MSE: 1.1479125404715901e-09
 
 Optimizing GP hyperparameters using 5-fold cross-validation...
 Evaluating 100 hyperparameter candidates using 5-fold CV...
@@ -609,7 +612,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-100%|██████████| 30/30 [00:03&lt;00:00,  9.54it/s]
+100%|██████████| 30/30 [00:03&lt;00:00,  9.18it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -617,7 +620,7 @@ Evaluating 100 hyperparameter candidates using 5-fold CV...
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Train MSE: 1.3316804418558262e-13
+Train MSE: 6.8732024410845975e-09
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -629,7 +632,7 @@ Train MSE: 1.3316804418558262e-13
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[44]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">xpred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
@@ -668,7 +671,7 @@ True global maximum at x=-0.712 with f(x)=3.573
 <h2>Visualize the Optimization Process<a class="headerlink" href="#Visualize-the-Optimization-Process" title="Link to this heading">¶</a></h2>
 <p>Let’s create a visualization showing the true function, the GP surrogate model, and the points selected by the Jones algorithm.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[45]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get GP predictions over the domain</span>
@@ -693,7 +696,7 @@ True global maximum at x=-0.712 with f(x)=3.573
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[46]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Final iteration prediction</span>

@@ -652,19 +652,17 @@ class SurrogateModel(object):
             hp_bounds[pnames.index("mean:value")] = mean_bounds
             
         if self.fit_amp:
-            amp_bounds = [np.var(self._y) * 10**self.gp_amp_rng[0], np.var(self._y) * 10**self.gp_amp_rng[1]] 
-            hp_bounds[pnames.index(f"{self.kernel_amp_key}:log_constant")] = amp_bounds
-
+            # log_constant is stored in natural-log space, so bounds must also be in log space.
+            hp_bounds[pnames.index(f"{self.kernel_amp_key}:log_constant")] = self.ln_gp_amp_rng
         if self.fit_white_noise:
             wn_bounds = [self.white_noise - 3, self.white_noise + 3]
             hp_bounds[pnames.index("white_noise:value")] = wn_bounds
             
         if self.uniform_scales == True:
-            hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M")] = self.gp_scale_rng
+            hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M")] = self.ln_gp_scale_rng
         else:
             for ii in range(self.ndim):
-                hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M_{ii}_{ii}")] = self.gp_scale_rng
-
+                hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M_{ii}_{ii}")] = self.ln_gp_scale_rng
         self.hp_bounds = np.array(hp_bounds)
         self.gp_hyper_prior = partial(ut.lnprior_uniform, bounds=self.hp_bounds)
         
@@ -976,12 +974,16 @@ class SurrogateModel(object):
         
         # -------------------------------------------------------------------------
         # set the bounds for scale length parameters
-        self.gp_scale_rng = gp_scale_rng
-        self.gp_amp_rng = gp_amp_rng
+        self.log_gp_scale_rng = np.array(gp_scale_rng, dtype=float)
+        self.log_gp_amp_rng = np.array(gp_amp_rng, dtype=float)
+        
+        # input bounds are in base 10 log space, but george stores log_constant in natural log space, so we need to convert the bounds
+        self.ln_gp_scale_rng = np.log(10**self.log_gp_scale_rng)
+        self.ln_gp_amp_rng = np.log(10**self.log_gp_amp_rng)
         
         # metric_bounds expects log-scale bounds
-        log_metric_bounds = [(min(gp_scale_rng), max(gp_scale_rng)) for _ in range(self.ndim)]
-        metric_bounds = [(np.e**min(gp_scale_rng), np.e**max(gp_scale_rng)) for _ in range(self.ndim)]
+        log_metric_bounds = [(min(self.ln_gp_scale_rng), max(self.ln_gp_scale_rng)) for _ in range(self.ndim)]
+        metric_bounds = [(np.e**min(self.ln_gp_scale_rng), np.e**max(self.ln_gp_scale_rng)) for _ in range(self.ndim)]
 
         valid_scales = False
         max_attempts = 10  # Prevent infinite loops
@@ -991,8 +993,8 @@ class SurrogateModel(object):
             attempt += 1
             
             # Generate initial scale length in linear scale (metric parameter expects linear scale)
-            # gp_scale_rng is in log scale, so convert to linear scale for initial guess
-            log_initial_lscale = np.random.uniform(min(gp_scale_rng), max(gp_scale_rng), self.ndim)
+            # ln_gp_scale_rng is in log scale, so convert to linear scale for initial guess
+            log_initial_lscale = np.random.uniform(min(self.ln_gp_scale_rng), max(self.ln_gp_scale_rng), self.ndim)
             initial_lscale = np.exp(log_initial_lscale)
             
             # Note: metric is linear scale, but metric_bounds are log scale!
@@ -1051,7 +1053,7 @@ class SurrogateModel(object):
         if not valid_scales:
             raise RuntimeError(f"Failed to initialize GP after {max_attempts} attempts. "
                                f"Check your data, kernel choice, and scale bounds. "
-                               f"Current settings: kernel={kernel}, gp_scale_rng={gp_scale_rng}")
+                               f"Current settings: kernel={kernel}, log_gp_scale_rng={self.log_gp_scale_rng}")
                 
         self.param_names_full = self.gp.get_parameter_names(include_frozen=False)
         self.param_names_optimized = []
@@ -1592,6 +1594,56 @@ class SurrogateModel(object):
         # Return a picklable cached surrogate likelihood object
         return CachedSurrogateLikelihood(gp_iter, _y_cond, self.theta_scaler, 
                                        self.y_scaler, self.ndim, return_var=return_var)
+
+
+    def find_max_surrogate(self, nopt=10, method="l-bfgs-b"):
+        """
+        Find the parameter values that maximize the GP surrogate model prediction.
+
+        Uses multi-start numerical optimization on the negative surrogate log
+        likelihood to locate the global maximum of the surrogate surface.
+
+        :param nopt: Number of optimization restarts. More restarts reduce the
+            chance of converging to a local maximum. Default is 10.
+        :type nopt: *int, optional*
+        :param method: Scipy optimization method. Default is "l-bfgs-b".
+        :type method: *str, optional*
+
+        :returns:
+            - **theta_max** (*ndarray of shape (ndim,)*) -- Parameter values at the surrogate maximum (unscaled).
+            - **y_max** (*float*) -- Surrogate log likelihood value at the maximum.
+        :rtype: *tuple*
+        """
+
+        def neg_surrogate(_theta_scaled):
+            theta = self.theta_scaler.inverse_transform(_theta_scaled.reshape(1, -1))
+            return -float(self.surrogate_log_likelihood(theta.flatten()))
+
+        starting_points = self._prior_sampler(nsample=nopt)
+
+        best_theta = None
+        best_val = np.inf
+
+        for x0 in starting_points:
+            try:
+                res = op.minimize(neg_surrogate, x0, method=method,
+                                  bounds=self._bounds,
+                                  options={"maxiter": 200})
+                if res.success and res.fun < best_val:
+                    best_val = res.fun
+                    best_theta = res.x
+            except Exception:
+                continue
+
+        if best_theta is None:
+            # fall back to best training point if all restarts failed
+            idx = np.argmax(self._y)
+            best_theta = self._theta[idx]
+
+        theta_max = self.theta_scaler.inverse_transform(best_theta.reshape(1, -1)).flatten()
+        y_max = float(self.surrogate_log_likelihood(theta_max))
+
+        return theta_max, y_max
 
 
     def find_next_point(self, nopt=3, optimizer_kwargs={}):
@@ -3757,8 +3809,9 @@ class SurrogateModel(object):
             - 'gp_train_corner': Corner plot of final training samples
             - 'gp_train_scatter': Scatter plot of training samples vs predictions
             
-            **GP visualization (2D only):**
-            - 'gp_fit_2D': 2D contour plot of GP surrogate surface
+            **GP visualization:**
+            - 'gp_fit_2D': 2D contour plot of GP surrogate surface (2D only)
+            - 'gp_predictions_1D': 1D slices of GP mean and variance through the surrogate maximum
             
             **MCMC diagnostics:**
             - 'emcee_corner': Corner plot of emcee posterior samples
@@ -3840,7 +3893,8 @@ class SurrogateModel(object):
         # ================================
 
         if "gp_all" in plots:
-            gp_plots = ["test_mse", "test_scaled_mse", "test_log_mse", "gp_hyperparam", "gp_timing", "gp_train_scatter"]
+            gp_plots = ["test_mse", "test_scaled_mse", "test_log_mse", "gp_hyperparam", "gp_timing", "gp_train_scatter",
+                        "gp_predictions_1D"]
             if self.ndim == 2:
                 gp_plots.append("gp_fit_2D")
             for pl in gp_plots:
@@ -3974,6 +4028,16 @@ class SurrogateModel(object):
             else:
                 raise print("theta must be 2D to use true_fn_2D!")
 
+        # 1D GP prediction slices through the surrogate maximum
+        if "gp_predictions_1D" in plots:
+            if hasattr(self, "_theta") and hasattr(self, "gp"):
+                print("Plotting 1D GP predictions...")
+                theta_max, _ = self.find_max_surrogate()
+                return vis.plot_gp_predictions_1D(self, theta_max,
+                                                  savedir=self.savedir, show=show)
+            else:
+                raise NameError("Must run init_train and init_gp before plotting gp_predictions_1D.")
+
         # ================================
         # emcee plots
         # ================================
@@ -4011,7 +4075,7 @@ class SurrogateModel(object):
 
         # dynesty posterior samples
         if "dynesty_corner" in plots:  
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty posterior...")
                 return vis.plot_corner(self, self.dynesty_samples, sampler="dynesty_", show=show);
             else:
@@ -4025,14 +4089,14 @@ class SurrogateModel(object):
                 raise NameError("Must run run_dynesty before plotting dynesty_corner.")
 
         if "dynesty_traceplot" in plots:
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty traceplot...")
                 return vis.plot_dynesty_traceplot(self, show=show)
             else:
                 raise NameError("Must run run_dynesty before plotting dynesty_traceplot.")
 
         if "dynesty_runplot" in plots:
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty runplot...")
                 return vis.plot_dynesty_runplot(self, show=show)
             else:
@@ -4043,7 +4107,7 @@ class SurrogateModel(object):
         # ================================
 
         if "mcmc_comparison" in plots:
-            if hasattr(self, "emcee_samples") and hasattr(self, "res"):
+            if hasattr(self, "emcee_samples") and hasattr(self, "dynesty_samples"):
                 print("Plotting emcee vs dynesty posterior comparison...")
                 return vis.plot_emcee_dynesty_comparison(self, show=show)
             else:

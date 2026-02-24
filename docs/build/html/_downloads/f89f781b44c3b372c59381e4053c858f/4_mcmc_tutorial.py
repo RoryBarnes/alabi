@@ -20,6 +20,14 @@ from functools import partial
 
 import alabi
 
+
+
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
+
 # %% [markdown]
 # First, we need to define the same function that was used when creating the cached model, then we can reload our results from the previous tutorial:
 
@@ -85,13 +93,15 @@ sm.run_emcee(
 
     prior_fn=prior_fn,                      # if None, defaults to uniform prior within bounds
 
-    nwalkers=10,
+    nwalkers=4,
 
     nsteps=int(2e4),
 
     burn=int(1e3),
 
     multi_proc=True,
+
+    min_ess=1000
 
 )
 
@@ -136,7 +146,9 @@ sm.run_dynesty(like_fn=sm.surrogate_log_likelihood,    # use like_fn=sm.true_log
 
                sampler_kwargs=dynesty_sampler_kwargs, 
 
-               run_kwargs=dynesty_run_kwargs)
+               run_kwargs=dynesty_run_kwargs,
+
+               min_ess=1000)
 
 # %%
 sm.plot(plots=["dynesty_corner"]);
@@ -146,12 +158,3 @@ sm.plot(plots=["dynesty_traceplot"]);
 
 # %%
 sm.plot(plots=["dynesty_runplot"]);
-
-# %% [markdown]
-# Compare the results from both samplers:
-
-# %%
-sm.plot(plots=["mcmc_comparison"]);
-
-# %% [markdown]
-# Both samplers achieve similar results for this example!

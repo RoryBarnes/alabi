@@ -9,8 +9,9 @@ You can run this script directly or copy sections into your own code.
 """
 
 # %% [markdown]
-# # Installation
+# # Installation + Quickstart
 # 
+# To install alabi, clone it from the git repo:
 # ```bash
 # git clone https://github.com/jbirky/alabi
 # cd alabi
@@ -18,8 +19,6 @@ You can run this script directly or copy sections into your own code.
 # ```
 
 # %% [markdown]
-# # Quickstart Example
-# 
 # ### Step 1
 # 
 # Import python modules:
@@ -33,11 +32,19 @@ import matplotlib.pyplot as plt
 
 from alabi.core import SurrogateModel
 
-import multiprocessing as mp
+
+
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
 
 
 
-np.random.seed(7)
+random_state = 7
+
+np.random.seed(random_state)
 
 # %% [markdown]
 # ### Step 2
@@ -59,7 +66,7 @@ bounds = [(-1, 1)]
 # Initialize the surrogate model, specifying the function to train on, the bounds of the input space, and directory where the results will be saved:
 
 # %%
-sm = SurrogateModel(lnlike_fn=test1d_fn, bounds=bounds, savedir=f"results/test1d")
+sm = SurrogateModel(lnlike_fn=test1d_fn, bounds=bounds, savedir=f"results/test1d", random_state=random_state)
 
 # %% [markdown]
 # ### Step 4

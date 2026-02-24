@@ -26,7 +26,13 @@ import alabi
 
 from alabi.core import SurrogateModel
 
-import alabi.utility as ut
+
+
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
 
 # %%
 def test1d_fn(theta):

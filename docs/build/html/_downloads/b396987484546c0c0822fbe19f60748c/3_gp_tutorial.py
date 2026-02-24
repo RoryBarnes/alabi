@@ -20,6 +20,14 @@ import numpy as np
 
 from alabi import SurrogateModel
 
+
+
+from matplotlib import rcParams
+
+# rcParams['font.family'] = 'serif'
+
+# rcParams['text.usetex'] = True
+
 # %% [markdown]
 # ### Define a Test Problem: Rosenbrock Function
 # 

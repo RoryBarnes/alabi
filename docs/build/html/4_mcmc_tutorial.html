@@ -214,8 +214,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Intro</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html#Quickstart-Example">Quickstart Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="1_quickstart.html">Installation + Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="2_save_reload.html">Saving and Reloading</a></li>
 <li class="toctree-l1"><a class="reference internal" href="3_gp_tutorial.html">GP Training</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">MCMC sampling</a></li>
@@ -298,6 +297,10 @@ Interactive online version:
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%</span><span class="k">matplotlib</span> inline
 <span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">alabi</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">rcParams</span>
+<span class="c1"># rcParams[&#39;font.family&#39;] = &#39;serif&#39;</span>
+<span class="c1"># rcParams[&#39;text.usetex&#39;] = True</span>
 </pre></div>
 </div>
 </div>
@@ -350,10 +353,11 @@ Interactive online version:
 <span class="n">sm</span><span class="o">.</span><span class="n">run_emcee</span><span class="p">(</span>
     <span class="n">like_fn</span><span class="o">=</span><span class="n">sm</span><span class="o">.</span><span class="n">surrogate_log_likelihood</span><span class="p">,</span>    <span class="c1"># use like_fn=sm.true_log_likelihood to sample the true function</span>
     <span class="n">prior_fn</span><span class="o">=</span><span class="n">prior_fn</span><span class="p">,</span>                      <span class="c1"># if None, defaults to uniform prior within bounds</span>
-    <span class="n">nwalkers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">nwalkers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">nsteps</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="mf">2e4</span><span class="p">),</span>
     <span class="n">burn</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="mf">1e3</span><span class="p">),</span>
     <span class="n">multi_proc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">min_ess</span><span class="o">=</span><span class="mi">1000</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -363,9 +367,9 @@ Interactive online version:
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Running emcee with 10 walkers for 20000 steps on 1 cores...
+Running emcee with 4 walkers for 20000 steps on 1 cores...
 
-Run 1: Need 10000 more samples...
+Run 1: Need 1000 more samples...
 ==================================================
 </pre></div></div>
 </div>
@@ -374,57 +378,24 @@ Run 1: Need 10000 more samples...
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-  0%|          | 0/20000 [00:00&lt;?, ?it/s]100%|██████████| 20000/20000 [01:47&lt;00:00, 185.87it/s]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-burn-in estimate: 346
-thin estimate: 37
-
-Run 1 complete: 5130 samples
-Total accumulated samples: 5130
-
-Run 2: Need 4870 more samples...
-==================================================
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-100%|██████████| 20000/20000 [01:48&lt;00:00, 184.49it/s]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-burn-in estimate: 328
-thin estimate: 35
-
-Run 2 complete: 5420 samples
-Total accumulated samples: 10550
-
-Combined 2 runs into 10550 total samples
-Total samples: 10550
-Mean acceptance fraction: 0.531
-Mean autocorrelation time: 117.597 steps
-Caching model to results/rosenbrock_2d/surrogate_model...
-Saving final emcee samples to results/rosenbrock_2d/emcee_samples_final_likelihood_iter_100.npz ...
+100%|██████████| 20000/20000 [00:46&lt;00:00, 427.49it/s]
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
+burn-in estimate: 336
+thin estimate: 55
 
+Run 1 complete: 1380 samples
+Total accumulated samples: 1380
+Total samples: 1380
+Mean acceptance fraction: 0.524
+Mean autocorrelation time: 139.952 steps
+Caching model to results/rosenbrock_2d/surrogate_model...
+Saving final emcee samples to results/rosenbrock_2d/emcee_samples_final_likelihood_iter_100.npz ...
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -456,7 +427,7 @@ Saving to  results/rosenbrock_2d/emcee__posterior_likelihood.png
 <h2>Sampling with <code class="docutils literal notranslate"><span class="pre">dynesty</span></code><a class="headerlink" href="#Sampling-with-dynesty" title="Link to this heading">¶</a></h2>
 <p>Now let’s use the <code class="docutils literal notranslate"><span class="pre">dynesty</span></code> nested sampler for comparison with default settings (uniform prior):</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set up uniform prior - dynesty requires separate prior transform function</span>
@@ -475,7 +446,8 @@ Saving to  results/rosenbrock_2d/emcee__posterior_likelihood.png
                <span class="n">prior_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>        <span class="c1"># if None, defaults to uniform prior within bounds</span>
                <span class="n">multi_proc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                       <span class="c1"># optional parallelization (oftentimes not worth it for dynesty)</span>
                <span class="n">sampler_kwargs</span><span class="o">=</span><span class="n">dynesty_sampler_kwargs</span><span class="p">,</span>
-               <span class="n">run_kwargs</span><span class="o">=</span><span class="n">dynesty_run_kwargs</span><span class="p">)</span>
+               <span class="n">run_kwargs</span><span class="o">=</span><span class="n">dynesty_run_kwargs</span><span class="p">,</span>
+               <span class="n">min_ess</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -488,20 +460,31 @@ Initializing dynesty with self.surrogate_log_likelihood surrogate model as likel
 Initialized dynesty DynamicNestedSampler.
 Running dynesty with 100 live points on 1 cores...
 
-Run 1: Need 10000 more samples...
+Run 1: Need 1000 more samples...
 ==================================================
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+10569it [01:22, 127.78it/s, batch: 42 | bound: 11 | nc: 1 | ncall: 145458 | eff(%):  7.235 | loglstar: -2.350 &lt;  0.009 &lt; -0.180 | logz: -2.616 +/-  0.042 | stop:  0.987]
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-2569it [00:16, 191.40it/s, batch: 9 | bound: 12 | nc: 14 | ncall: 28855 | eff(%):  8.743 | loglstar: -3.790 &lt; -0.178 &lt; -0.085 | logz: -2.234 +/-  0.067 | stop:  5.025]
+Run 1 complete: 10569 samples, logZ = -2.616
+Total accumulated samples: 10569
+Caching model to results/rosenbrock_2d/surrogate_model...
+Saved dynesty samples to results/rosenbrock_2d/dynesty_samples_final_surrogate_iter_100.npz
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sm</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plots</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dynesty_corner&quot;</span><span class="p">]);</span>
@@ -514,6 +497,7 @@ Run 1: Need 10000 more samples...
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 Plotting dynesty posterior...
+Saving to  results/rosenbrock_2d/dynesty__posterior_surrogate.png
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -524,7 +508,7 @@ Plotting dynesty posterior...
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sm</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plots</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dynesty_traceplot&quot;</span><span class="p">]);</span>
@@ -537,6 +521,7 @@ Plotting dynesty posterior...
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 Plotting dynesty traceplot...
+Saving to  results/rosenbrock_2d/dynesty_traceplot_surrogate.png
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -547,7 +532,7 @@ Plotting dynesty traceplot...
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sm</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plots</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dynesty_runplot&quot;</span><span class="p">]);</span>
@@ -560,6 +545,7 @@ Plotting dynesty traceplot...
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 Plotting dynesty runplot...
+Saving to  results/rosenbrock_2d/dynesty_runplot_surrogate.png
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -569,31 +555,6 @@ Plotting dynesty runplot...
 <img alt="_images/4_mcmc_tutorial_12_1.png" src="_images/4_mcmc_tutorial_12_1.png" />
 </div>
 </div>
-<p>Compare the results from both samplers:</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sm</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plots</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;mcmc_comparison&quot;</span><span class="p">]);</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Plotting emcee vs dynesty posterior comparison...
-</pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="_images/4_mcmc_tutorial_14_1.png" src="_images/4_mcmc_tutorial_14_1.png" />
-</div>
-</div>
-<p>Both samplers achieve similar results for this example!</p>
 </section>
 </section>
 <div class="sphx-glr-download sphx-glr-download-python docutils container">
