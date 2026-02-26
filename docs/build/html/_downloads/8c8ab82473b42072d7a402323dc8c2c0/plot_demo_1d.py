@@ -42,43 +42,24 @@ bounds = [(-2,3)]
 # %%
 np.random.seed(7)
 
-
-
 sm = SurrogateModel(lnlike_fn=test1d_fn, 
-
                     bounds=bounds, 
-
                     savedir=f"results/test1d")
 
-
-
 sm.init_samples(ntrain=6, sampler="sobol")
-
 sm.init_gp(kernel="ExpSquaredKernel", 
-
            fit_amp=True, 
-
            fit_mean=True, 
-
            white_noise=-12, 
-
            gp_scale_rng=[-1,1],
-
            theta_scaler=alabi.no_scaler,
-
            y_scaler=alabi.no_scaler)
 
-
-
 def bape(xgrid):
-
-    return -np.array([ut.bape_utility(np.array([x]), sm._y, sm.gp, sm.bounds) for x in xgrid])
-
-
+    return -np.array([ut.bape_utility(np.array([x]), lambda t: sm.gp.predict(sm._y, t, return_var=True), sm._bounds) for x in xgrid])
 
 def agp(xgrid):
-
-    return -np.array([ut.agp_utility(np.array([x]), sm._y, sm.gp, sm.bounds) for x in xgrid])
+    return -np.array([ut.agp_utility(np.array([x]), lambda t: sm.gp.predict(sm._y, t, return_var=True), sm._bounds) for x in xgrid])
 
 # %% [markdown]
 # Define a plot function for inspecting the current GP fit so that we can compare the fit before and after active learning training.

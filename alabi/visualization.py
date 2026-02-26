@@ -13,17 +13,16 @@ from functools import partial
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import rc
-rc('text', usetex=True)
+rc('text', usetex=False)
 rc('xtick', labelsize=16)
 rc('ytick', labelsize=16)
-font = {'family' : 'normal',
-        'weight' : 'light'}
+font = {'weight' : 'light'}
 rc('font', **font)
 
 from dynesty import plotting as dyplot
 
-__all__ = ["plot_error_vs_iteration", 
-           "plot_hyperparam_vs_iteration", 
+__all__ = ["plot_error_vs_iteration",
+           "plot_hyperparam_vs_iteration",
            "plot_train_time_vs_iteration",
            "plot_corner_lnp",
            "plot_corner_scatter",
@@ -36,7 +35,8 @@ __all__ = ["plot_error_vs_iteration",
            "plot_dynesty_runplot",
            "plot_mcmc_comparison",
            "plot_sampler_comparison",
-           "plot_2D_panel4"]
+           "plot_2D_panel4",
+           "plot_gp_predictions_1D"]
 
 
 def plot_error_vs_iteration(iteration, train_error, test_error=None, log=False, 
@@ -82,8 +82,8 @@ def plot_hyperparam_vs_iteration(sm, title="GP fit", show=False):
             ax1.plot(sm.training_results["iteration"], hp_values.T[ii], 
                     label=hp_names[ii].replace('_', ' '))
         ax1.tick_params(axis='y')
-        ax1.fill_between(sm.training_results["iteration"], min(sm.gp_scale_rng),
-                         max(sm.gp_scale_rng), color="C2", alpha=0.1, label="GP scale range")
+        ax1.fill_between(sm.training_results["iteration"], min(sm.log_gp_scale_rng),
+                         max(sm.log_gp_scale_rng), color="C2", alpha=0.1, label="GP scale range")
 
         # plot mean on separate axis
         ax2 = ax1.twinx()
@@ -291,7 +291,11 @@ def plot_true_fit_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=
 
 def plot_utility_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=None):
 
-    obj_fn = partial(sm.utility, y=sm._y, gp=sm.gp, bounds=sm._bounds)
+    predict_gp = lambda t: sm.gp.predict(sm._y, t, return_var=True)
+    if sm.algorithm == "jones":
+        obj_fn = partial(sm.utility, predict_gp=predict_gp, bounds=sm._bounds, y_best=np.max(sm._y))
+    else:
+        obj_fn = partial(sm.utility, predict_gp=predict_gp, bounds=sm._bounds)
 
     fig = plot_contour_2D(obj_fn, sm._bounds, sm.savedir, savename="objective_function.png", 
                     title=f"{sm.algorithm.upper()} function", ngrid=ngrid, cmap='Greens_r',
@@ -307,7 +311,7 @@ def plot_utility_2D(sm, ngrid=60, show=False, log_scale=False, vmin=None, vmax=N
 def plot_gp_fit_2D(sm, ngrid=60, title="GP fit", cmap="Blues_r", show=False, vmin=None, vmax=None, log_scale=False):
 
     theta = sm.theta() 
-    theta0 = sm.theta_scaler.inverse_transform(sm._theta0)
+    theta0 = sm.theta_scaler.inverse_transform(sm._theta[:sm.ninit_train])
 
     xarr = np.linspace(sm.bounds[0][0], sm.bounds[0][1], ngrid)
     yarr = np.linspace(sm.bounds[1][0], sm.bounds[1][1], ngrid)
@@ -318,7 +322,7 @@ def plot_gp_fit_2D(sm, ngrid=60, title="GP fit", cmap="Blues_r", show=False, vmi
     for i in range(Z.shape[0]):
         for j in range(Z.shape[1]):
             tt = np.array([X[i][j], Y[i][j]]).reshape(1,-1)
-            Z[i][j] = sm.surrogate_log_likelihood(tt)
+            Z[i][j] = float(np.squeeze(sm.surrogate_log_likelihood(tt)))
         
     fig = plt.figure()
     if log_scale:        
@@ -362,7 +366,7 @@ def plot_corner(sm, samples, sampler="", show=False):
 
 def plot_corner_kde(sm, show=False):
 
-    fig, _ = dyplot.cornerplot(sm.res, quantiles=[0.16, 0.5, 0.84], span=sm.bounds,
+    fig, _ = dyplot.cornerplot(sm.dynesty_results, quantiles=[0.16, 0.5, 0.84], span=sm.bounds,
                                title_kwargs={"fontsize": 15}, label_kwargs={"fontsize": 15})
     
     savename = f"dynesty_posterior_kde_{sm.like_fn_name}.png"
@@ -399,7 +403,7 @@ def plot_emcee_walkers(sm, show=False):
 
 def plot_dynesty_traceplot(sm, show=False):
 
-    fig, _ = dyplot.traceplot(sm.res, trace_cmap='plasma',
+    fig, _ = dyplot.traceplot(sm.dynesty_results, trace_cmap='plasma',
                                  quantiles=None, show_titles=True,
                                  label_kwargs={"fontsize": 22})
     
@@ -415,7 +419,7 @@ def plot_dynesty_traceplot(sm, show=False):
 
 def plot_dynesty_runplot(sm, show=False):
 
-    fig, _ = dyplot.runplot(sm.res, label_kwargs={"fontsize": 22})
+    fig, _ = dyplot.runplot(sm.dynesty_results, label_kwargs={"fontsize": 22})
     
     savename = f"dynesty_runplot_{sm.like_fn_name}.png"
     print("Saving to ", f"{sm.savedir}/{savename}")
@@ -530,10 +534,10 @@ def plot_sampler_comparison(sm, show=False):
 
     # Add log evidence information
     text_y = legend_y - 0.05
-    if has_dynesty and hasattr(sm, 'res') and hasattr(sm.res, 'logz'):
+    if has_dynesty and hasattr(sm, 'dynesty_results') and hasattr(sm.dynesty_results, 'logz'):
         # Dynesty log evidence
-        logz_dynesty = sm.res.logz[-1] if isinstance(sm.res.logz, np.ndarray) else sm.res.logz
-        logz_err_dynesty = sm.res.logzerr[-1] if isinstance(sm.res.logzerr, np.ndarray) else sm.res.logzerr
+        logz_dynesty = sm.dynesty_results.logz[-1] if isinstance(sm.dynesty_results.logz, np.ndarray) else sm.dynesty_results.logz
+        logz_err_dynesty = sm.dynesty_results.logzerr[-1] if isinstance(sm.dynesty_results.logzerr, np.ndarray) else sm.dynesty_results.logzerr
         fig.axes[1].text(2.2, text_y, f"Dynesty log Z = {logz_dynesty:.2f} ± {logz_err_dynesty:.2f}", 
                         fontsize=20, color=colors[1], ha='left')
         text_y -= 0.125
@@ -573,3 +577,149 @@ def plot_2D_panel4(savedir, savename=None):
         new_im.save(f"{savedir}/{savename}")
 
     return new_im
+
+
+def plot_gp_predictions_1D(sm, theta, ngrid=100, nsigma=2, plot_samples=None, plot_layout=None,
+                           title=None, show=False, savedir=".", savename=None, ylim=None,
+                           legend_loc="best"):
+    """
+    Plot 1D GP surrogate predictions for each input parameter, varying one
+    parameter at a time while holding the rest fixed at ``theta``.
+
+    For each dimension a panel is drawn showing:
+
+    * The GP predictive mean as a function of that parameter.
+    * A shaded band of ±``nsigma`` predictive standard deviations.
+    * Vertical dashed line marking the reference value in ``theta``.
+    * Scatter of training points projected onto that parameter axis.
+
+    :param sm: Trained surrogate model.
+    :type sm: *SurrogateModel*
+    :param theta: Reference point (unscaled). Each panel sweeps one dimension
+        across ``sm.bounds`` while the other dimensions are held fixed at the
+        corresponding value in ``theta``.
+    :type theta: *array-like of shape (ndim,)*
+    :param ngrid: Number of grid points used per sweep. Default is 100.
+    :type ngrid: *int, optional*
+    :param nsigma: Width of the shaded uncertainty band in standard deviations.
+        Default is 2.
+    :type nsigma: *int, optional*
+    :param plot_samples: Number of posterior function samples to draw from the GP
+        and overlay on each panel. Each sample is a random draw from the GP posterior
+        conditioned on the training data, plotted as a thin semi-transparent line.
+        If None (default), no samples are drawn.
+    :type plot_samples: *int or None, optional*
+    :param title: Overall figure title. If None, no suptitle is added.
+    :type title: *str or None, optional*
+    :param show: Whether to call ``plt.show()``. Default is False.
+    :type show: *bool, optional*
+    :param savedir: Directory to save the figure. Default is ``"."``.
+    :type savedir: *str, optional*
+    :param savename: Filename for the saved figure. If None, defaults to
+        ``"gp_predictions_1D.png"``.
+    :type savename: *str or None, optional*
+    :param ylim: Optional y-axis limits for all panels, given as (ymin, ymax). If None, the limits are determined automatically.
+    :type ylim: *tuple of (float, float) or None, optional*
+
+    :returns: The matplotlib figure.
+    :rtype: *matplotlib.figure.Figure*
+    """
+
+    theta = np.asarray(theta, dtype=float)
+    ndim = sm.ndim
+    bounds = sm.bounds
+    train_theta = sm.theta()  # unscaled training points, shape (n, ndim)
+    train_y = sm.y()          # unscaled training outputs, shape (n,)
+
+    # Extract per-dimension length scales from the current GP.
+    # george stores log(l^2) = log_M_{i}_{i}, so l_i = exp(log_M_{i}_{i} / 2).
+    hp_dict = sm.gp.get_parameter_dict()
+    if sm.uniform_scales:
+        log_M = hp_dict[f"{sm.kernel_scale_key}:metric:log_M"]
+        length_scales = [np.exp(log_M / 2)] * ndim
+    else:
+        length_scales = [
+            np.exp(hp_dict[f"{sm.kernel_scale_key}:metric:log_M_{ii}_{ii}"] / 2)
+            for ii in range(ndim)
+        ]
+    log_length_scales = np.log10(length_scales)
+    
+    if plot_layout is not None:
+        nrows, ncols = plot_layout
+    else: 
+        ncols = min(ndim, 3)
+        nrows = int(np.ceil(ndim / ncols))
+        
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4 * nrows), squeeze=False)
+
+    for dim in range(ndim):
+        ax = axes[dim // ncols][dim % ncols]
+
+        # Build a sweep along dimension `dim`, others fixed at theta
+        xarr = np.linspace(bounds[dim][0], bounds[dim][1], ngrid)
+        sweep = np.tile(theta, (ngrid, 1))
+        sweep[:, dim] = xarr
+
+        mu, var = sm.surrogate_log_likelihood(sweep, return_var=True)
+        std = np.sqrt(np.abs(var))
+
+        # Draw posterior samples first so mean/band render on top
+        if plot_samples is not None and plot_samples > 0:
+            _sweep_scaled = sm.theta_scaler.transform(sweep)
+            try:
+                _mu_s, _cov = sm.gp.predict(sm._y, _sweep_scaled,
+                                             return_cov=True, return_var=False)
+                _cov += 1e-10 * np.eye(len(_cov))   # jitter for numerical stability
+                _raw_samples = np.random.multivariate_normal(_mu_s, _cov, size=plot_samples)
+                for i, _s in enumerate(_raw_samples):
+                    y_s = sm.y_scaler.inverse_transform(_s.reshape(-1, 1)).flatten()
+                    ax.plot(xarr, y_s, color="C0", lw=0.6, alpha=0.25,
+                            label="GP samples" if i == 0 else None)
+            except np.linalg.LinAlgError:
+                pass  # skip if posterior covariance is not positive-definite
+
+        ax.plot(xarr, mu, color="C0", lw=1.5, label="GP mean")
+        ax.fill_between(xarr, mu - nsigma * std, mu + nsigma * std,
+                        color="C0", alpha=0.25,
+                        label=rf"$\pm{nsigma}\sigma$")
+
+        # Training points projected onto this dimension
+        ax.scatter(train_theta[:, dim], train_y, color="C1", s=15,
+                   zorder=3, alpha=0.7, label="training data")
+
+        # Mark the reference value
+        ax.axvline(theta[dim], color="k", linestyle="--", lw=1.0,
+                   label=r"$\theta_{\rm ref}$")
+
+        ax.set_title(rf"$\log_{{10}}\ell_{{%s}} = {log_length_scales[dim]:.3f}$"%(dim), fontsize=20)
+        ax.set_xlabel(sm.param_names[dim], fontsize=18)
+        ax.set_ylabel("surrogate log likelihood", fontsize=18)
+        ax.minorticks_on()
+        ax.legend(fontsize=13, loc=legend_loc)
+
+        if ylim is not None:
+            ax.set_ylim(ylim)
+
+    # Hide any unused subplots
+    for idx in range(ndim, nrows * ncols):
+        axes[idx // ncols][idx % ncols].set_visible(False)
+
+    if title is not None:
+        fig.suptitle(title, fontsize=18, y=1.01)
+
+    plt.tight_layout()
+
+    if savename is None:
+        savename = "gp_predictions_1D.png"
+
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
+
+    print("Saving to ", f"{savedir}/{savename}")
+    fig.savefig(f"{savedir}/{savename}", bbox_inches="tight", dpi=200)
+
+    if show:
+        plt.show()
+    plt.close()
+
+    return fig

@@ -390,7 +390,7 @@ def optimize_gp(gp, _theta, _y, gp_hyper_prior, p0, bounds=None,
         for ii, x0 in enumerate(p0):
             try:
                 result = minimize(obj_fn, x0, method=method, jac=jac, bounds=bounds, options=optimizer_kwargs)
-                print("opt iterations:", result.nit, result.success)
+                # print("opt iterations:", result.nit, result.success)
                 
                 if np.isfinite(gp_hyper_prior(result.x)):
                     # Compute marginal log likelihood for this set of kernel hyperparameters
@@ -403,12 +403,12 @@ def optimize_gp(gp, _theta, _y, gp_hyper_prior, p0, bounds=None,
                     mll.append(current_mll)
                             
                 else:
-                    print(f"\nWarning: GP hyperparameter optimization restart {ii} failed. Solution failed prior bounds.\n")
+                    warning_msg = f"\nWarning: GP hyperparameter optimization restart {ii} failed. Solution failed prior bounds.\n"
                     res.append(init_hp)
                     mll.append(-np.inf)
                     
             except Exception as e:
-                print(f"\nWarning: GP hyperparameter optimization restart {ii} failed with error: {e}\n")
+                warning_msg = f"\nWarning: GP hyperparameter optimization restart {ii} failed with error: {e}\n"
                 res.append(init_hp)
                 mll.append(-np.inf)
 
@@ -419,11 +419,11 @@ def optimize_gp(gp, _theta, _y, gp_hyper_prior, p0, bounds=None,
                 gp.set_parameter_vector(res[ind])   
                 gp.recompute()
             except:
-                print("\nWarning: Failed to set best hyperparameters. Using initial values.\n")
+                warning_msg = "\nWarning: Failed to set best hyperparameters. Using initial values.\n"
                 gp.set_parameter_vector(init_hp)
                 gp.recompute()
         else:
-            print("\nWarning: All hyperparameter optimizations failed. Using initial values.\n")
+            warning_msg = "\nWarning: All hyperparameter optimizations failed. Using initial values.\n"
             gp.set_parameter_vector(init_hp)
             
     else:
@@ -435,16 +435,18 @@ def optimize_gp(gp, _theta, _y, gp_hyper_prior, p0, bounds=None,
                 gp.set_parameter_vector(result.x)
                 gp.recompute()
             else:
-                print("\nWarning: GP hyperparameter optimization failed. Using initial values.\n")
+                warning_msg = "\nWarning: GP hyperparameter optimization failed. Using initial values.\n"
                 gp.set_parameter_vector(init_hp)
                 gp.recompute()
                 
         except Exception as e:
-            print(f"\nWarning: GP hyperparameter optimization failed with error: {e}. Using initial values.\n")
+            warning_msg = f"\nWarning: GP hyperparameter optimization failed with error: {e}. Using initial values.\n"
             gp.set_parameter_vector(init_hp)
             gp.recompute()
 
-    return gp
+    warning_msg = warning_msg if 'warning_msg' in locals() else None
+    
+    return gp, warning_msg
 
 
 def weighted_mse_by_probability(y_true, y_pred, weight_method='exponential', temperature=1.0):
