@@ -1159,10 +1159,14 @@ class SurrogateModel(object):
                 print(f"Warning: Hyperparameters contain NaN or Inf: {hyperparameters_array}")
                 print("Reoptimizing hyperparameters from scratch...")
                 gp, _ = self._opt_gp(**self.opt_gp_kwargs, _theta=_theta, _y=_y)
-                # Validate the reoptimized GP
+                # Validate the reoptimized GP — clip if still invalid
                 reopt_params = gp.get_parameter_vector()
                 if not np.all(np.isfinite(reopt_params)):
-                    raise ValueError(f"Reoptimized GP still has invalid parameters: {reopt_params}")
+                    print(f"Warning: Reoptimized GP still has invalid parameters: {reopt_params}")
+                    reopt_params = np.where(np.isfinite(reopt_params), reopt_params, 0.0)
+                    print(f"Clipped to: {reopt_params}")
+                    gp.set_parameter_vector(reopt_params)
+                    gp.compute(_theta)
                 return gp, time.time() - t0
         
         gp = self.set_hyperparameter_vector(gp, hyperparameters)
@@ -1320,7 +1324,15 @@ class SurrogateModel(object):
                 def get_fun_value(res):
                     return res.fun
                 results = min(opt_results, key=get_fun_value)
-            
+
+            # Clip optimized parameters to bounds and validate
+            if self.hp_bounds is not None:
+                results.x = np.clip(results.x, self.hp_bounds[:, 0], self.hp_bounds[:, 1])
+            if not np.all(np.isfinite(results.x)):
+                print(f"Warning: GP optimization produced non-finite parameters: {results.x}")
+                print("Falling back to current hyperparameters.")
+                results.x = current_hp
+
             op_gp = self.set_hyperparameter_vector(current_gp, results.x)
             op_gp.compute(_theta)
             
@@ -2116,7 +2128,7 @@ class SurrogateModel(object):
         raise NotImplementedError("Not implemented.")
 
 
-    def run_emcee(self, like_fn=None, prior_fn=None, nwalkers=None, nsteps=int(5e4), sampler_kwargs={}, run_kwargs={},
+    def run_emcee(self, like_fn=None, prior_fn=None, p0=None, nwalkers=None, nsteps=int(5e4), sampler_kwargs={}, run_kwargs={},
                   opt_init=False, multi_proc=True, prior_fn_comment=None, burn=None, thin=None, samples_file=None, min_ess=int(1e4)):
         """
         Sample the posterior using the emcee affine-invariant MCMC algorithm.
@@ -2299,12 +2311,12 @@ class SurrogateModel(object):
             self.nwalkers = int(nwalkers)
         self.nsteps = int(nsteps)
 
-        # Optimize walker initialization?
-        if opt_init == True:
-            # start walkers near the estimated maximum
+        # Initialize walker positions
+        if p0 is not None:
+            pass  # use caller-provided p0
+        elif opt_init:
             p0 = self.find_map(prior_fn=self.prior_fn)
         else:
-            # start walkers at random points in the prior space
             p0 = ut.prior_sampler(nsample=self.nwalkers, bounds=self.bounds, sampler="uniform", random_state=None)
 
         # set up multiprocessing pool with MPI safety
