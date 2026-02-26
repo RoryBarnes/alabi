@@ -272,7 +272,7 @@ class SurrogateModel(object):
         self.bounds = np.array(bounds)
 
         # define prior sampler with unscaled bounds 
-        self.prior_sampler = partial(ut.prior_sampler, bounds=self.bounds, sampler="uniform", random_state=None)
+        self.prior_sampler = partial(ut.prior_sampler, bounds=self.bounds, sampler="uniform", random_state=self.random_state)
 
         # Determine dimensionality 
         self.ndim = len(self.bounds)
@@ -481,9 +481,9 @@ class SurrogateModel(object):
 
         # note: initial samples should be drawn uniformly in scaled space
         # if theta_scaler is a non-linear transform, then samples in real space will be non-uniform
-        # _theta = self._prior_sampler(nsample=nsample, sampler=sampler, random_state=None)
+        # _theta = self._prior_sampler(nsample=nsample, sampler=sampler, random_state=self.random_state)
         # theta = self.theta_scaler.inverse_transform(_theta)
-        theta = self.prior_sampler(nsample=nsample, sampler=sampler, random_state=None) 
+        theta = self.prior_sampler(nsample=nsample, sampler=sampler, random_state=self.random_state) 
         
         # create pool for parallel evaluation of likelihood function
         pool = self._get_pool(ncore=self.ncore)  
@@ -507,7 +507,7 @@ class SurrogateModel(object):
                 ynan = True
                 while ynan == True:
                     # resample theta
-                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=None)
+                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=self.random_state)
                     y[ii] = self.true_log_likelihood(new_theta).reshape(-1, 1)
                     theta[ii] = new_theta
                     if not (np.isnan(y[ii]) or np.isinf(y[ii])):
@@ -943,7 +943,7 @@ class SurrogateModel(object):
         
         # Scale bounds to [0, 1] for training
         self._bounds = self.theta_scaler.transform(self.bounds.T).T
-        self._prior_sampler = partial(ut.prior_sampler, bounds=self._bounds, sampler="uniform", random_state=None)
+        self._prior_sampler = partial(ut.prior_sampler, bounds=self._bounds, sampler="uniform", random_state=self.random_state)
 
         # Output scaling function
         self.y_scaler = y_scaler
@@ -1249,7 +1249,7 @@ class SurrogateModel(object):
                 print(f"\nOptimizing GP hyperparameters using {cv_folds}-fold cross-validation...")
             
             try:                         
-                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=None)
+                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=self.random_state)
 
                 # Add current hyperparameters as a candidate if GP exists
                 if hasattr(self, "gp"):
@@ -1357,7 +1357,7 @@ class SurrogateModel(object):
             if self.gp_nopt <= 1:
                 results = _optimize_fn(current_hp)
             else:
-                p0 = ut.prior_sampler(bounds=self.hp_bounds, nsample=self.gp_nopt, sampler="lhs", random_state=None)
+                p0 = ut.prior_sampler(bounds=self.hp_bounds, nsample=self.gp_nopt, sampler="lhs", random_state=self.random_state)
                 p0[0] = current_hp
                 
                 if self.ncore <= 1:
@@ -2390,7 +2390,7 @@ class SurrogateModel(object):
             p0 = self.find_map(prior_fn=self.prior_fn)
         else:
             # start walkers at random points in the prior space
-            p0 = ut.prior_sampler(nsample=self.nwalkers, bounds=self.bounds, sampler="uniform", random_state=None)
+            p0 = ut.prior_sampler(nsample=self.nwalkers, bounds=self.bounds, sampler="uniform", random_state=self.random_state)
 
         # set up multiprocessing pool with MPI safety
         emcee_pool = self._get_pool(ncore=self.ncore) if multi_proc and self.ncore > 1 else None

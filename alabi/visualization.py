@@ -580,7 +580,8 @@ def plot_2D_panel4(savedir, savename=None):
 
 
 def plot_gp_predictions_1D(sm, theta, ngrid=100, nsigma=2, plot_samples=None, plot_layout=None,
-                           title=None, show=False, savedir=".", savename=None, ylim=None):
+                           title=None, show=False, savedir=".", savename=None, ylim=None,
+                           legend_loc="best"):
     """
     Plot 1D GP surrogate predictions for each input parameter, varying one
     parameter at a time while holding the rest fixed at ``theta``.
@@ -669,8 +670,7 @@ def plot_gp_predictions_1D(sm, theta, ngrid=100, nsigma=2, plot_samples=None, pl
                 _mu_s, _cov = sm.gp.predict(sm._y, _sweep_scaled,
                                              return_cov=True, return_var=False)
                 _cov += 1e-10 * np.eye(len(_cov))   # jitter for numerical stability
-                _raw_samples = np.random.multivariate_normal(_mu_s, _cov,
-                                                             size=plot_samples)
+                _raw_samples = np.random.multivariate_normal(_mu_s, _cov, size=plot_samples)
                 for i, _s in enumerate(_raw_samples):
                     y_s = sm.y_scaler.inverse_transform(_s.reshape(-1, 1)).flatten()
                     ax.plot(xarr, y_s, color="C0", lw=0.6, alpha=0.25,
@@ -691,11 +691,11 @@ def plot_gp_predictions_1D(sm, theta, ngrid=100, nsigma=2, plot_samples=None, pl
         ax.axvline(theta[dim], color="k", linestyle="--", lw=1.0,
                    label=r"$\theta_{\rm ref}$")
 
-        ax.set_title(rf"{sm.param_names[dim]},  $\log_{{10}}\ell = {log_length_scales[dim]:.3f}$", fontsize=13)
-        ax.set_xlabel(sm.param_names[dim], fontsize=14)
-        ax.set_ylabel("surrogate log likelihood", fontsize=12)
+        ax.set_title(rf"$\log_{{10}}\ell_{{%s}} = {log_length_scales[dim]:.3f}$"%(dim), fontsize=20)
+        ax.set_xlabel(sm.param_names[dim], fontsize=18)
+        ax.set_ylabel("surrogate log likelihood", fontsize=18)
         ax.minorticks_on()
-        ax.legend(fontsize=10, loc="best")
+        ax.legend(fontsize=13, loc=legend_loc)
 
         if ylim is not None:
             ax.set_ylim(ylim)
