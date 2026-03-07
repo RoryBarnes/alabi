@@ -247,7 +247,7 @@ class SurrogateModel(object):
 
     def __init__(self, lnlike_fn=None, bounds=None, param_names=None, 
                  cache=True, savedir="results/", model_name="surrogate_model",
-                 verbose=True, ncore=1, pool_method="forkserver", ignore_warnings=True,
+                 verbose=True, show_warnings=False, ncore=1, pool_method="forkserver", ignore_warnings=True,
                  random_state=None):
 
         # Check all required inputs are specified
@@ -272,7 +272,7 @@ class SurrogateModel(object):
         self.bounds = np.array(bounds)
 
         # define prior sampler with unscaled bounds 
-        self.prior_sampler = partial(ut.prior_sampler, bounds=self.bounds, sampler="uniform", random_state=None)
+        self.prior_sampler = partial(ut.prior_sampler, bounds=self.bounds, sampler="uniform", random_state=self.random_state)
 
         # Determine dimensionality 
         self.ndim = len(self.bounds)
@@ -300,6 +300,7 @@ class SurrogateModel(object):
 
         # Print progress statements
         self.verbose = verbose
+        self.show_warnings = show_warnings
         
         # Ignore warnings
         if ignore_warnings:
@@ -465,13 +466,13 @@ class SurrogateModel(object):
         return _theta, _y
 
 
-    def init_train(self, nsample=None, sampler="uniform", fname="initial_training_sample.npz"):
+    def init_train(self, nsample=None, sampler="lhs", fname="initial_training_sample.npz"):
         """
         :param nsample: (*int, optional*) 
             Number of samples. Defaults to ``nsample = 50 * self.ndim``
 
         :param sampler: (*str, optional*) 
-            Sampling method. Defaults to ``'sobol'``. 
+            Sampling method. Defaults to ``'lhs'``. 
             See ``utility.prior_sampler`` for more details.
         """
 
@@ -480,9 +481,9 @@ class SurrogateModel(object):
 
         # note: initial samples should be drawn uniformly in scaled space
         # if theta_scaler is a non-linear transform, then samples in real space will be non-uniform
-        # _theta = self._prior_sampler(nsample=nsample, sampler=sampler, random_state=None)
+        # _theta = self._prior_sampler(nsample=nsample, sampler=sampler, random_state=self.random_state)
         # theta = self.theta_scaler.inverse_transform(_theta)
-        theta = self.prior_sampler(nsample=nsample, sampler=sampler, random_state=None) 
+        theta = self.prior_sampler(nsample=nsample, sampler=sampler, random_state=self.random_state) 
         
         # create pool for parallel evaluation of likelihood function
         pool = self._get_pool(ncore=self.ncore)  
@@ -506,8 +507,8 @@ class SurrogateModel(object):
                 ynan = True
                 while ynan == True:
                     # resample theta
-                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=None).flatten()
-                    y[ii, 0] = float(self.true_log_likelihood(new_theta))
+                    new_theta = self.prior_sampler(nsample=1, sampler="uniform", random_state=self.random_state)
+                    y[ii] = self.true_log_likelihood(new_theta).reshape(-1, 1)
                     theta[ii] = new_theta
                     if not (np.isnan(y[ii]) or np.isinf(y[ii])):
                         ynan = False
@@ -582,7 +583,7 @@ class SurrogateModel(object):
                 print(f"Unable to reload {cache_file} due to error: {e}. Computing new samples with {self.ncore} cores...")
                 theta, y = self.init_train(nsample=ntrain, sampler=sampler, fname=train_file)
         else:
-            train_file="initial_train_file_sample.npz"
+            train_file = "initial_train_file_sample.npz"
             theta, y = self.init_train(nsample=ntrain, sampler=sampler, fname=train_file)
             
         # --------------------------------------------------------
@@ -651,19 +652,17 @@ class SurrogateModel(object):
             hp_bounds[pnames.index("mean:value")] = mean_bounds
             
         if self.fit_amp:
-            amp_bounds = [np.var(self._y) * 10**self.gp_amp_rng[0], np.var(self._y) * 10**self.gp_amp_rng[1]] 
-            hp_bounds[pnames.index(f"{self.kernel_amp_key}:log_constant")] = amp_bounds
-
+            # log_constant is stored in natural-log space, so bounds must also be in log space.
+            hp_bounds[pnames.index(f"{self.kernel_amp_key}:log_constant")] = self.ln_gp_amp_rng
         if self.fit_white_noise:
             wn_bounds = [self.white_noise - 3, self.white_noise + 3]
             hp_bounds[pnames.index("white_noise:value")] = wn_bounds
             
         if self.uniform_scales == True:
-            hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M")] = self.gp_scale_rng
+            hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M")] = self.ln_gp_scale_rng
         else:
             for ii in range(self.ndim):
-                hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M_{ii}_{ii}")] = self.gp_scale_rng
-
+                hp_bounds[pnames.index(f"{self.kernel_scale_key}:metric:log_M_{ii}_{ii}")] = self.ln_gp_scale_rng
         self.hp_bounds = np.array(hp_bounds)
         self.gp_hyper_prior = partial(ut.lnprior_uniform, bounds=self.hp_bounds)
         
@@ -906,6 +905,10 @@ class SurrogateModel(object):
         if hasattr(self, 'gp') and (overwrite == False):
             raise AssertionError(
                 "GP kernel already assigned. Use overwrite=True to re-assign the kernel.")
+
+        if not hasattr(self, "theta_train") or not hasattr(self, "y_train"):
+            raise AssertionError(
+                "Training data not found. Call init_samples() before init_gp().")
             
         # optional hyperparameter choices
         self.fit_amp = fit_amp
@@ -951,7 +954,7 @@ class SurrogateModel(object):
         
         # Scale bounds to [0, 1] for training
         self._bounds = self.theta_scaler.transform(self.bounds.T).T
-        self._prior_sampler = partial(ut.prior_sampler, bounds=self._bounds, sampler="uniform", random_state=None)
+        self._prior_sampler = partial(ut.prior_sampler, bounds=self._bounds, sampler="uniform", random_state=self.random_state)
 
         # Output scaling function
         self.y_scaler = y_scaler
@@ -960,8 +963,9 @@ class SurrogateModel(object):
         self._theta, self._y = self.refit_scalers(self.theta_train, self.y_train)
         
         # Save scaled training data for GP fitting
-        self._theta_test = self.theta_scaler.transform(self.theta_test)
-        self._y_test = self.y_scaler.transform(self.y_test.reshape(-1, 1)).flatten()
+        if self.ntest > 0:
+            self._theta_test = self.theta_scaler.transform(self.theta_test)
+            self._y_test = self.y_scaler.transform(np.array(self.y_test).reshape(-1, 1)).flatten()
         self._theta_train = self._theta
         self._y_train = self._y
 
@@ -981,12 +985,16 @@ class SurrogateModel(object):
         
         # -------------------------------------------------------------------------
         # set the bounds for scale length parameters
-        self.gp_scale_rng = gp_scale_rng
-        self.gp_amp_rng = gp_amp_rng
+        self.log_gp_scale_rng = np.array(gp_scale_rng, dtype=float)
+        self.log_gp_amp_rng = np.array(gp_amp_rng, dtype=float)
+        
+        # input bounds are in base 10 log space, but george stores log_constant in natural log space, so we need to convert the bounds
+        self.ln_gp_scale_rng = np.log(10**self.log_gp_scale_rng)
+        self.ln_gp_amp_rng = np.log(10**self.log_gp_amp_rng)
         
         # metric_bounds expects log-scale bounds
-        log_metric_bounds = [(min(gp_scale_rng), max(gp_scale_rng)) for _ in range(self.ndim)]
-        metric_bounds = [(np.e**min(gp_scale_rng), np.e**max(gp_scale_rng)) for _ in range(self.ndim)]
+        log_metric_bounds = [(min(self.ln_gp_scale_rng), max(self.ln_gp_scale_rng)) for _ in range(self.ndim)]
+        metric_bounds = [(np.e**min(self.ln_gp_scale_rng), np.e**max(self.ln_gp_scale_rng)) for _ in range(self.ndim)]
 
         valid_scales = False
         max_attempts = 10  # Prevent infinite loops
@@ -996,8 +1004,8 @@ class SurrogateModel(object):
             attempt += 1
             
             # Generate initial scale length in linear scale (metric parameter expects linear scale)
-            # gp_scale_rng is in log scale, so convert to linear scale for initial guess
-            log_initial_lscale = np.random.uniform(min(gp_scale_rng), max(gp_scale_rng), self.ndim)
+            # ln_gp_scale_rng is in log scale, so convert to linear scale for initial guess
+            log_initial_lscale = np.random.uniform(min(self.ln_gp_scale_rng), max(self.ln_gp_scale_rng), self.ndim)
             initial_lscale = np.exp(log_initial_lscale)
             
             # Note: metric is linear scale, but metric_bounds are log scale!
@@ -1056,7 +1064,7 @@ class SurrogateModel(object):
         if not valid_scales:
             raise RuntimeError(f"Failed to initialize GP after {max_attempts} attempts. "
                                f"Check your data, kernel choice, and scale bounds. "
-                               f"Current settings: kernel={kernel}, gp_scale_rng={gp_scale_rng}")
+                               f"Current settings: kernel={kernel}, log_gp_scale_rng={self.log_gp_scale_rng}")
                 
         self.param_names_full = self.gp.get_parameter_names(include_frozen=False)
         self.param_names_optimized = []
@@ -1156,8 +1164,9 @@ class SurrogateModel(object):
         if hyperparameters is not None:
             hyperparameters_array = np.atleast_1d(hyperparameters)
             if not np.all(np.isfinite(hyperparameters_array)):
-                print(f"Warning: Hyperparameters contain NaN or Inf: {hyperparameters_array}")
-                print("Reoptimizing hyperparameters from scratch...")
+                if self.show_warnings:
+                    print(f"Warning: Hyperparameters contain NaN or Inf: {hyperparameters_array}")
+                    print("Reoptimizing hyperparameters from scratch...")
                 gp, _ = self._opt_gp(**self.opt_gp_kwargs, _theta=_theta, _y=_y)
                 # Validate the reoptimized GP — clip if still invalid
                 reopt_params = gp.get_parameter_vector()
@@ -1248,6 +1257,64 @@ class SurrogateModel(object):
             use_gradient = True
 
         self.set_hyperparam_prior_bounds()
+
+        if hyperopt_method.lower() == "cv":
+            # Cross-validation hyperparameter optimization    
+            if self.verbose:
+                print(f"\nOptimizing GP hyperparameters using {cv_folds}-fold cross-validation...")
+            
+            try:                         
+                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=self.random_state)
+
+                # Add current hyperparameters as a candidate if GP exists
+                if hasattr(self, "gp"):
+                    candidates[0] = self.get_hyperparameter_vector(self.gp)
+                
+                # Expand hyperparameters if using uniform scales
+                # CV function expects full parameter vectors that can be set directly on GP
+                if self.uniform_scales:
+                    candidates_expanded = np.array([self.expand_hyperparameter_vector(c) for c in candidates])
+                else:
+                    candidates_expanded = candidates
+                     
+                # suppress outputs if running parallel chains   
+                if multi_proc:
+                    verbose_cv = False  # Suppress for parallel chains
+                else:
+                    verbose_cv = True  # Always show CV diagnostics
+                
+                # Optimize using cross-validation
+                pool = self._get_pool(ncore=self.ncore) if multi_proc else None
+                op_gp = gp_utils.optimize_gp_kfold_cv(
+                    self.gp, _theta, _y,
+                    candidates_expanded,
+                    self.y_scaler,
+                    k_folds=cv_folds,
+                    scoring=cv_scoring,
+                    pool=pool,
+                    stage2_candidates=cv_stage2_candidates,
+                    stage2_width=cv_stage2_width,
+                    stage3_candidates=cv_stage3_candidates,
+                    stage3_width=cv_stage3_width,
+                    weighted_mse_method=cv_weighted_mse_method,
+                    weighted_mse_factor=cv_weighted_factor,
+                    verbose=verbose_cv
+                )
+                self._close_pool(pool)
+                
+            except Exception as e:
+                import traceback
+                import sys
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                tb_line = traceback.extract_tb(exc_traceback)[-1]
+                if self.show_warnings:
+                    print(f"Warning: CV hyperparameter optimization failed: {str(e)}")
+                    print(f"Error at line {tb_line.lineno} in {tb_line.filename}: {tb_line.line}")
+                    print("Falling back to maximum likelihood optimization...")
+                
+                # Fall back to ML optimization if CV fails
+                op_gp = None
+                hyperopt_method = "ml"
             
         if hyperopt_method.lower() == "ml":
             current_gp = self.gp
@@ -1305,7 +1372,7 @@ class SurrogateModel(object):
             if self.gp_nopt <= 1:
                 results = _optimize_fn(current_hp)
             else:
-                p0 = ut.prior_sampler(bounds=self.hp_bounds, nsample=self.gp_nopt, sampler="lhs", random_state=None)
+                p0 = ut.prior_sampler(bounds=self.hp_bounds, nsample=self.gp_nopt, sampler="lhs", random_state=self.random_state)
                 p0[0] = current_hp
                 
                 if self.ncore <= 1:
@@ -1349,61 +1416,6 @@ class SurrogateModel(object):
                     print(f"Final -logL: \t {nll_fit:.4f} | \t Regularization: None ")
                 print(f"{results.nit} iterations | Success: {results.success} | Message: {results.message} \n")
 
-        if hyperopt_method.lower() == "cv":
-            # Cross-validation hyperparameter optimization    
-            if self.verbose:
-                print(f"\nOptimizing GP hyperparameters using {cv_folds}-fold cross-validation...")
-            
-            try:                         
-                candidates = ut.prior_sampler(bounds=self.hp_bounds, nsample=cv_n_candidates, sampler="lhs", random_state=None)
-
-                # Add current hyperparameters as a candidate if GP exists
-                if hasattr(self, "gp"):
-                    candidates[0] = self.get_hyperparameter_vector(self.gp)
-                
-                # Expand hyperparameters if using uniform scales
-                # CV function expects full parameter vectors that can be set directly on GP
-                if self.uniform_scales:
-                    candidates_expanded = np.array([self.expand_hyperparameter_vector(c) for c in candidates])
-                else:
-                    candidates_expanded = candidates
-                     
-                # suppress outputs if running parallel chains   
-                if multi_proc:
-                    verbose_cv = False  # Suppress for parallel chains
-                else:
-                    verbose_cv = True  # Always show CV diagnostics
-                
-                # Optimize using cross-validation
-                pool = self._get_pool(ncore=self.ncore) if multi_proc else None
-                op_gp = gp_utils.optimize_gp_kfold_cv(
-                    self.gp, _theta, _y,
-                    candidates_expanded,
-                    self.y_scaler,
-                    k_folds=cv_folds,
-                    scoring=cv_scoring,
-                    pool=pool,
-                    stage2_candidates=cv_stage2_candidates,
-                    stage2_width=cv_stage2_width,
-                    stage3_candidates=cv_stage3_candidates,
-                    stage3_width=cv_stage3_width,
-                    weighted_mse_method=cv_weighted_mse_method,
-                    weighted_mse_factor=cv_weighted_factor,
-                    verbose=verbose_cv
-                )
-                self._close_pool(pool)
-                
-            except Exception as e:
-                import traceback
-                import sys
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                tb_line = traceback.extract_tb(exc_traceback)[-1]
-                print(f"Warning: CV hyperparameter optimization failed: {str(e)}")
-                print(f"Error at line {tb_line.lineno} in {tb_line.filename}: {tb_line.line}")
-                print("Falling back to maximum likelihood optimization...")
-                
-                # Fall back to ML optimization if CV fails
-                op_gp = None
 
         # If op_gp is not set (CV failed or wasn't used), use current GP or initialize one
         if 'op_gp' not in locals() or op_gp is None:
@@ -1607,6 +1619,56 @@ class SurrogateModel(object):
                                        self.y_scaler, self.ndim, return_var=return_var)
 
 
+    def find_max_surrogate(self, nopt=10, method="l-bfgs-b"):
+        """
+        Find the parameter values that maximize the GP surrogate model prediction.
+
+        Uses multi-start numerical optimization on the negative surrogate log
+        likelihood to locate the global maximum of the surrogate surface.
+
+        :param nopt: Number of optimization restarts. More restarts reduce the
+            chance of converging to a local maximum. Default is 10.
+        :type nopt: *int, optional*
+        :param method: Scipy optimization method. Default is "l-bfgs-b".
+        :type method: *str, optional*
+
+        :returns:
+            - **theta_max** (*ndarray of shape (ndim,)*) -- Parameter values at the surrogate maximum (unscaled).
+            - **y_max** (*float*) -- Surrogate log likelihood value at the maximum.
+        :rtype: *tuple*
+        """
+
+        def neg_surrogate(_theta_scaled):
+            theta = self.theta_scaler.inverse_transform(_theta_scaled.reshape(1, -1))
+            return -float(self.surrogate_log_likelihood(theta.flatten()))
+
+        starting_points = self._prior_sampler(nsample=nopt)
+
+        best_theta = None
+        best_val = np.inf
+
+        for x0 in starting_points:
+            try:
+                res = op.minimize(neg_surrogate, x0, method=method,
+                                  bounds=self._bounds,
+                                  options={"maxiter": 200})
+                if res.success and res.fun < best_val:
+                    best_val = res.fun
+                    best_theta = res.x
+            except Exception:
+                continue
+
+        if best_theta is None:
+            # fall back to best training point if all restarts failed
+            idx = np.argmax(self._y)
+            best_theta = self._theta[idx]
+
+        theta_max = self.theta_scaler.inverse_transform(best_theta.reshape(1, -1)).flatten()
+        y_max = float(self.surrogate_log_likelihood(theta_max))
+
+        return theta_max, y_max
+
+
     def find_next_point(self, nopt=3, optimizer_kwargs={}):
         """
         Find next set of ``(theta, y)`` training points by maximizing the
@@ -1620,9 +1682,18 @@ class SurrogateModel(object):
         """
 
         opt_timing_0 = time.time()
-        
-        predict_gp = lambda _theta_xs: self.gp.predict(self._y, _theta_xs, return_var=True)
-        
+
+        # Safe GP prediction wrapper: if the kernel matrix is non-PD (e.g. after a bad
+        # hyperparameter optimisation step), return zero mean and large variance so that
+        # the acquisition function degrades gracefully to exploration-only behaviour
+        # instead of raising an unhandled LinAlgError.
+        def predict_gp(_theta_xs):
+            try:
+                return self.gp.predict(self._y, _theta_xs, return_var=True)
+            except Exception:
+                n = _theta_xs.shape[0] if hasattr(_theta_xs, 'shape') else 1
+                return np.zeros(n), np.ones(n) * 1e10
+
         # Create objective function with appropriate parameters for different algorithms
         if self.algorithm == "jones":
             # Jones (Expected Improvement) requires y_best parameter
@@ -1648,25 +1719,28 @@ class SurrogateModel(object):
                                         method=self.obj_opt_method,
                                         options=optimizer_kwargs,
                                         grad_obj_fn=grad_obj_fn,
-                                        pool=None)
+                                        pool=None,
+                                        show_warnings=self.show_warnings)
 
         opt_timing = time.time() - opt_timing_0
         # self.training_results["acquisition_optimizer_niter"].append(opt_result.nit)
         
         # Validate optimization result
         if not np.all(np.isfinite(_thetaN)):
-            print(f"Warning: Acquisition function optimization failed. Falling back to random sampling.")
+            if self.show_warnings:
+                current_iter = self.training_results["iteration"][-1] if len(self.training_results["iteration"]) > 0 else 0
+                print(f"Warning: Acquisition function optimization failed at iteration {current_iter}. Falling back to random sampling.")
             # Fall back to random sampling from prior
             _thetaN = self._prior_sampler(nsample=1).flatten()
         
         thetaN = self.theta_scaler.inverse_transform(_thetaN.reshape(1, -1))
-        yN = self.true_log_likelihood(thetaN.flatten())
+        yN = np.atleast_1d(self.true_log_likelihood(thetaN.flatten()))
 
         # Validate new training point
         if not np.any(np.isfinite(thetaN.flatten())):
             print(f"New theta contains NaN or Inf: {thetaN}")
             return None, None, opt_timing
-        if not np.isfinite(float(yN)):
+        if not np.all(np.isfinite(yN)):
             print(f"New y value is NaN or Inf: {yN}. Check your likelihood function at theta={thetaN}")
             return None, None, opt_timing
         
@@ -1793,15 +1867,27 @@ class SurrogateModel(object):
             success = False
             while not success and attempts < max_attempts:
 
-                # Find next training point! (always single-threaded)
-                _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
-                
+                # Initialize to None so they are always defined after the loop
+                _theta_prop, _y_prop = None, None
+
+                try:
+                    # Find next training point! (always single-threaded)
+                    _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
+                except Exception as e:
+                    if self.show_warnings:
+                        print(f"Warning: find_next_point raised exception at iteration {ii}: {e}. Retrying.")
+
                 if _theta_prop is None or _y_prop is None:
                     attempts += 1
                 else:
-                    # Fit GP with new training point
-                    self.gp, fit_gp_timing = self._fit_gp(_theta=_theta_prop, _y=_y_prop, hyperparameters=self.gp.get_parameter_vector())
-                    success = True
+                    try:
+                        # Fit GP with new training point
+                        self.gp, fit_gp_timing = self._fit_gp(_theta=_theta_prop, _y=_y_prop, hyperparameters=self.gp.get_parameter_vector())
+                        success = True
+                    except Exception as e:
+                        if self.show_warnings:
+                            print(f"Warning: GP fit failed at iteration {ii}: {e}. Retrying with new point.")
+                        attempts += 1
 
                 if attempts >= max_attempts:
                     raise RuntimeError(f"Failed to find a valid training point after {max_attempts} attempts. \
@@ -1816,8 +1902,16 @@ class SurrogateModel(object):
 
                 reopt_kwargs = self.opt_gp_kwargs.copy()
                 reopt_kwargs["multi_proc"] = allow_opt_multiproc
-                # re-optimize hyperparamters
-                self.gp, _ = self._opt_gp(**reopt_kwargs)
+                # Save current params in case optimization leads to non-PD kernel
+                prev_params = self.gp.get_parameter_vector()
+                try:
+                    self.gp, _ = self._opt_gp(**reopt_kwargs)
+                    # Validate GP is still usable after optimization
+                    self.gp.predict(self._y, self._theta, return_cov=False)
+                except Exception as e:
+                    if self.show_warnings:
+                        print(f"Warning: GP re-optimization at iteration {ii + first_iter} produced invalid GP: {e}. Reverting hyperparameters.")
+                    self.gp.set_parameter_vector(prev_params)
                 
                 # record which iteration hyperparameters were optimized
                 self.training_results["gp_hyperparameter_opt_iteration"].append(ii + first_iter)
@@ -1841,7 +1935,8 @@ class SurrogateModel(object):
                 if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                     print("Train MSE:", training_mse)
             except Exception as e:
-                print(f"Warning: Error evaluating GP training error at iteration {ii + first_iter}: {e}")
+                if self.show_warnings:
+                    print(f"Warning: Error evaluating GP training error at iteration {ii + first_iter}: {e}")
                 training_mse = np.nan
                 training_scaled_mse = np.nan
 
@@ -1858,7 +1953,8 @@ class SurrogateModel(object):
                     if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                         print("Test MSE:", test_mse)
                 except Exception as e:
-                    print(f"Warning: Error evaluating GP test error at iteration {ii + first_iter}: {e}")
+                    if self.show_warnings:
+                        print(f"Warning: Error evaluating GP test error at iteration {ii + first_iter}: {e}")
                     test_mse = np.nan
                     test_scaled_mse = np.nan
             else:
@@ -2317,7 +2413,8 @@ class SurrogateModel(object):
         elif opt_init:
             p0 = self.find_map(prior_fn=self.prior_fn)
         else:
-            p0 = ut.prior_sampler(nsample=self.nwalkers, bounds=self.bounds, sampler="uniform", random_state=None)
+            # start walkers at random points in the prior space
+            p0 = ut.prior_sampler(nsample=self.nwalkers, bounds=self.bounds, sampler="uniform", random_state=self.random_state)
 
         # set up multiprocessing pool with MPI safety
         emcee_pool = self._get_pool(ncore=self.ncore) if multi_proc and self.ncore > 1 else None
@@ -2389,7 +2486,8 @@ class SurrogateModel(object):
         # Combine all chains and compute overall statistics
         if len(all_chains) > 1:
             self.emcee_samples = np.vstack(all_chains)
-            print(f"\nCombined {len(all_chains)} runs into {self.emcee_samples.shape[0]} total samples")
+            if self.verbose:
+                print(f"\nCombined {len(all_chains)} runs into {self.emcee_samples.shape[0]} total samples")
         else:
             self.emcee_samples = all_chains[0]
         
@@ -3744,8 +3842,9 @@ class SurrogateModel(object):
             - 'gp_train_corner': Corner plot of final training samples
             - 'gp_train_scatter': Scatter plot of training samples vs predictions
             
-            **GP visualization (2D only):**
-            - 'gp_fit_2D': 2D contour plot of GP surrogate surface
+            **GP visualization:**
+            - 'gp_fit_2D': 2D contour plot of GP surrogate surface (2D only)
+            - 'gp_predictions_1D': 1D slices of GP mean and variance through the surrogate maximum
             
             **MCMC diagnostics:**
             - 'emcee_corner': Corner plot of emcee posterior samples
@@ -3827,7 +3926,8 @@ class SurrogateModel(object):
         # ================================
 
         if "gp_all" in plots:
-            gp_plots = ["test_mse", "test_scaled_mse", "test_log_mse", "gp_hyperparam", "gp_timing", "gp_train_scatter"]
+            gp_plots = ["test_mse", "test_scaled_mse", "test_log_mse", "gp_hyperparam", "gp_timing", "gp_train_scatter",
+                        "gp_predictions_1D"]
             if self.ndim == 2:
                 gp_plots.append("gp_fit_2D")
             for pl in gp_plots:
@@ -3961,6 +4061,16 @@ class SurrogateModel(object):
             else:
                 raise print("theta must be 2D to use true_fn_2D!")
 
+        # 1D GP prediction slices through the surrogate maximum
+        if "gp_predictions_1D" in plots:
+            if hasattr(self, "_theta") and hasattr(self, "gp"):
+                print("Plotting 1D GP predictions...")
+                theta_max, _ = self.find_max_surrogate()
+                return vis.plot_gp_predictions_1D(self, theta_max,
+                                                  savedir=self.savedir, show=show)
+            else:
+                raise NameError("Must run init_train and init_gp before plotting gp_predictions_1D.")
+
         # ================================
         # emcee plots
         # ================================
@@ -3998,7 +4108,7 @@ class SurrogateModel(object):
 
         # dynesty posterior samples
         if "dynesty_corner" in plots:  
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty posterior...")
                 return vis.plot_corner(self, self.dynesty_samples, sampler="dynesty_", show=show);
             else:
@@ -4012,14 +4122,14 @@ class SurrogateModel(object):
                 raise NameError("Must run run_dynesty before plotting dynesty_corner.")
 
         if "dynesty_traceplot" in plots:
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty traceplot...")
                 return vis.plot_dynesty_traceplot(self, show=show)
             else:
                 raise NameError("Must run run_dynesty before plotting dynesty_traceplot.")
 
         if "dynesty_runplot" in plots:
-            if hasattr(self, "res"):
+            if hasattr(self, "dynesty_samples"):
                 print("Plotting dynesty runplot...")
                 return vis.plot_dynesty_runplot(self, show=show)
             else:
@@ -4030,7 +4140,7 @@ class SurrogateModel(object):
         # ================================
 
         if "mcmc_comparison" in plots:
-            if hasattr(self, "emcee_samples") and hasattr(self, "res"):
+            if hasattr(self, "emcee_samples") and hasattr(self, "dynesty_samples"):
                 print("Plotting emcee vs dynesty posterior comparison...")
                 return vis.plot_emcee_dynesty_comparison(self, show=show)
             else:

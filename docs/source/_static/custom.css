@@ -75,68 +75,30 @@ h6 {
     margin: 1em 0;
 }
 
-/* Limit height of long outputs */
-.nbsphinx .nboutput {
-    max-height: 400px;
+/* Make text outputs scrollable with a max height.
+   Targets stream outputs (print statements), text outputs, and highlighted output blocks.
+   Does NOT constrain image outputs. */
+.nboutput pre,
+.nboutput .highlight pre,
+.nboutput .output_subarea.output_stream pre,
+.nboutput .output_subarea.output_text pre,
+.nboutput .output_subarea.output_stderr pre {
+    max-height: 300px;
     overflow-y: auto;
-    margin: 0.5em 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    resize: vertical;
 }
 
-/* Style for truncated outputs */
-.nbsphinx .nboutput.nbsphinx-truncated::after {
-    content: "... [output truncated]";
-    display: block;
-    text-align: center;
-    font-style: italic;
-    color: #666;
-    padding: 0.5em;
-    background-color: #f8f9fa;
-    border-top: 1px solid #ddd;
-}
-
-/* Hide stderr outputs if desired */
-.nbsphinx .nboutput .stderr {
+/* Hide stderr outputs */
+.nbsphinx .nboutput .stderr,
+.nboutput .output_subarea.output_stderr {
     display: none;
 }
 
-/* Style for large dataframe outputs */
+/* Style for large dataframe/table outputs */
 .nbsphinx .nboutput table {
     max-height: 300px;
     overflow-y: auto;
     display: block;
-}
-
-/* Collapsible long outputs */
-.nbsphinx .nboutput-collapse {
-    max-height: 200px;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-    position: relative;
-}
-
-.nbsphinx .nboutput-collapse::after {
-    content: "Click to expand full output";
-    display: block;
-    text-align: center;
-    font-style: italic;
-    color: #007bff;
-    cursor: pointer;
-    padding: 0.5em;
-    background: linear-gradient(transparent, white);
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-}
-
-.nbsphinx .nboutput-collapse.expanded {
-    max-height: none;
-}
-
-.nbsphinx .nboutput-collapse.expanded::after {
-    display: none;
 }
 
 .sphx-glr-download a:hover {

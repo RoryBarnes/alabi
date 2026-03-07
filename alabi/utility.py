@@ -966,7 +966,7 @@ def assign_utility(algorithm):
     return utility, grad_utility
 
 
-def minimize_objective_single(idx, obj_fn, bounds, starting_point, method, options, grad_obj_fn=None):
+def minimize_objective_single(idx, obj_fn, bounds, starting_point, method, options, grad_obj_fn=None, show_warnings=False):
     """
     Single optimization run - used for parallelization.
     
@@ -1011,17 +1011,27 @@ def minimize_objective_single(idx, obj_fn, bounds, starting_point, method, optio
     # If solution is finite and allowed by the prior, save
     if np.all(np.isfinite(x_opt)) and np.all(np.isfinite(f_opt)):
         if np.isfinite(lnprior_uniform(x_opt, bounds)):
-            return x_opt, f_opt
+            if tmp.nit > 5:
+                return x_opt, f_opt
+            else:
+                if show_warnings:
+                    print(f"Warning: Acquisition function ran for {tmp.nit} iterations. Optimizer success: {tmp.success}")
+                if tmp.nit <= 1:
+                    return np.nan, np.nan
+                else:
+                    return x_opt, f_opt
         else:
-            print("Warning: Acquisition function optimization prior fail", x_opt)
+            if show_warnings:
+                print("Warning: Acquisition function optimization prior fail", x_opt)
             return np.nan, np.nan
     else:
-        print("Warning: Acquisition function optimization infinite fail", x_opt, f_opt)
+        if show_warnings:
+            print("Warning: Acquisition function optimization infinite fail", x_opt, f_opt)
         return np.nan, np.nan
 
 
 def minimize_objective(obj_fn, bounds=None, nopt=1, method="l-bfgs-b",
-                       ps=None, options=None, grad_obj_fn=None, pool=None):
+                       ps=None, options=None, grad_obj_fn=None, pool=None, show_warnings=False):
     """
     Find the global minimum of an acquisition function using multiple restarts.
     
@@ -1123,7 +1133,7 @@ def minimize_objective(obj_fn, bounds=None, nopt=1, method="l-bfgs-b",
     
     if pool is not None:
         def single_opt(ii):
-            return minimize_objective_single(ii, obj_fn, bounds, starting_points[ii], method, options, grad_obj_fn)
+            return minimize_objective_single(ii, obj_fn, bounds, starting_points[ii], method, options, grad_obj_fn, show_warnings)
 
         opt_results = pool.imap(single_opt, np.arange(nopt))
         min_theta = [res[0] for res in opt_results]
@@ -1133,7 +1143,7 @@ def minimize_objective(obj_fn, bounds=None, nopt=1, method="l-bfgs-b",
         min_theta = []
         min_obj = []
         for ii in range(nopt):
-            minx, miny = minimize_objective_single(ii, obj_fn, bounds, starting_points[ii], method, options, grad_obj_fn)
+            minx, miny = minimize_objective_single(ii, obj_fn, bounds, starting_points[ii], method, options, grad_obj_fn, show_warnings)
             min_theta.append(minx)
             min_obj.append(miny)
   
@@ -1144,7 +1154,7 @@ def minimize_objective(obj_fn, bounds=None, nopt=1, method="l-bfgs-b",
     
     if len(valid_results) == 0:
         # All optimizations failed - return NaN to signal failure
-        print(f"Warning: All {nopt} optimization attempts failed. Returning NaN.")
+        # print(f"Warning: All {nopt} optimization attempts failed. Returning NaN.")
         return np.nan, np.nan
     
     # Find best among valid results
