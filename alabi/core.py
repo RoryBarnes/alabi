@@ -1764,79 +1764,221 @@ class SurrogateModel(object):
         return _theta_prop, _y_prop, opt_timing
 
 
+    def _propose_next_point(self, nopt=3, optimizer_kwargs={}):
+        """
+        Propose the next training point by maximizing the acquisition function.
+        Returns the proposed point in unscaled (real) parameter space without
+        evaluating the likelihood or modifying training data.
+
+        :param nopt: (*int, optional*)
+            Number of optimization restarts. Defaults to 3.
+        :param optimizer_kwargs: (*dict, optional*)
+            Additional keyword arguments passed to scipy optimizer.
+
+        :returns: (*tuple*) ``(thetaN, opt_timing)`` where thetaN is a 1D array
+            in unscaled parameter space.
+        """
+
+        opt_timing_0 = time.time()
+
+        def predict_gp(_theta_xs):
+            try:
+                return self.gp.predict(self._y, _theta_xs, return_var=True)
+            except Exception:
+                n = _theta_xs.shape[0] if hasattr(_theta_xs, 'shape') else 1
+                return np.zeros(n), np.ones(n) * 1e10
+
+        if self.algorithm == "jones":
+            y_best = np.max(self._y)
+            obj_fn = partial(self.utility, predict_gp=predict_gp, bounds=self._bounds, y_best=y_best)
+        else:
+            obj_fn = partial(self.utility, predict_gp=predict_gp, bounds=self._bounds)
+
+        grad_obj_fn = None
+        if hasattr(self, 'grad_utility') and self.grad_utility is not None:
+            if self.algorithm == "jones":
+                grad_obj_fn = partial(self.grad_utility, gp=self.gp, bounds=self._bounds, y_best=y_best)
+            else:
+                grad_obj_fn = partial(self.grad_utility, gp=self.gp, bounds=self._bounds)
+
+        _thetaN, _ = ut.minimize_objective(obj_fn,
+                                        bounds=self._bounds,
+                                        nopt=nopt,
+                                        ps=self._prior_sampler,
+                                        method=self.obj_opt_method,
+                                        options=optimizer_kwargs,
+                                        grad_obj_fn=grad_obj_fn,
+                                        pool=None,
+                                        show_warnings=self.show_warnings)
+
+        opt_timing = time.time() - opt_timing_0
+
+        if not np.all(np.isfinite(_thetaN)):
+            if self.show_warnings:
+                current_iter = self.training_results["iteration"][-1] if len(self.training_results["iteration"]) > 0 else 0
+                print(f"Warning: Acquisition function optimization failed at iteration {current_iter}. Falling back to random sampling.")
+            _thetaN = self._prior_sampler(nsample=1).flatten()
+
+        thetaN = self.theta_scaler.inverse_transform(_thetaN.reshape(1, -1)).flatten()
+        return thetaN, opt_timing
+
+
+    def _evaluate_and_integrate_points(self, theta_list):
+        """
+        Evaluate likelihoods for proposed points in parallel and integrate valid
+        results into the training data with a single scaler refit.
+
+        :param theta_list: (*list*) List of 1D arrays, each an unscaled theta point.
+
+        :returns: (*tuple*) ``(_theta_prop, _y_prop)`` scaled arrays of all training
+            data including new points, or ``(None, None)`` if no valid points.
+        """
+
+        n_points = len(theta_list)
+
+        def safe_likelihood(theta):
+            try:
+                return self.true_log_likelihood(theta)
+            except Exception:
+                return np.nan
+
+        if n_points > 1 and self.ncore > 1:
+            pool = self._get_pool(ncore=min(n_points, self.ncore))
+            results = list(pool.map(safe_likelihood, theta_list))
+            self._close_pool(pool)
+        else:
+            results = [safe_likelihood(t) for t in theta_list]
+
+        valid_theta = []
+        valid_y = []
+        for theta, y_val in zip(theta_list, results):
+            y_val = np.atleast_1d(y_val)
+            if np.all(np.isfinite(theta)) and np.all(np.isfinite(y_val)):
+                valid_theta.append(theta.reshape(1, -1))
+                valid_y.append(float(y_val.flat[0]))
+
+        if len(valid_theta) == 0:
+            return None, None
+
+        theta_prop = np.append(self.theta(), np.vstack(valid_theta), axis=0)
+        y_prop = np.append(self.y(), np.array(valid_y))
+
+        _theta_prop, _y_prop = self.refit_scalers(theta_prop, y_prop)
+
+        if _theta_prop.shape[0] != _y_prop.shape[0]:
+            return None, None
+        if not np.all(np.isfinite(_theta_prop)) or not np.all(np.isfinite(_y_prop)):
+            if self.show_warnings:
+                print("Scaled training data contains NaN/Inf after integrating new points.")
+            return None, None
+
+        return _theta_prop, _y_prop
+
+
     def active_train(self, niter=100, algorithm="bape", gp_opt_freq=20, save_progress=False,
                      obj_opt_method="l-bfgs-b", nopt=5, optimizer_kwargs={}, use_grad_opt=True,
-                     show_progress=True, allow_opt_multiproc=True, max_attempts=10): 
+                     show_progress=True, allow_opt_multiproc=True, max_attempts=10,
+                     mode="serial", n_bonus=0, nrmse_target=None):
         """
         Perform active learning to iteratively improve the surrogate model.
-        
+
         Uses acquisition functions to intelligently select new training points that
         will most improve the Gaussian Process model. Different algorithms balance
         exploration (uncertainty reduction) vs exploitation (finding optima).
-        
+
         :param niter: (*int, optional, default=100*)
-            Number of active learning iterations. Each iteration adds one new training point.
-            
+            Number of active learning iterations. In serial mode each iteration adds
+            one training point. In hybrid mode each iteration adds up to
+            1 + n_bonus points.
+
         :param algorithm: (*str, optional, default="bape"*)
             Active learning algorithm. Options:
             - "bape": Bayesian Active Parameter Estimation (exploration-focused)
             - "jones": Jones algorithm (exploitation-focused, good for optimization)
             - "agp": Augmented Gaussian Process (balanced)
             - "alternate": Alternates between exploration and exploitation
-            
+
         :param gp_opt_freq: (*int, optional, default=20*)
             Frequency of GP hyperparameter re-optimization. GP hyperparameters are
             re-optimized every gp_opt_freq iterations. Lower values = more optimization.
-            
+
         :param save_progress: (*bool, optional, default=False*)
             Whether to save training progress data for later analysis.
-            
+
         :param obj_opt_method: (*str, optional, default="nelder-mead"*)
             Optimization method for acquisition function. Options:
             - "l-bfgs-b": L-BFGS-B (good with gradients)
             - "nelder-mead": Nelder-Mead simplex (gradient-free)
-            
+
         :param nopt: (*int, optional, default=1*)
             Number of optimization restarts for acquisition function. Higher values
             help avoid local minima but increase computation time.
-            
+
         :param use_grad_opt: (*bool, optional, default=True*)
             Whether to use gradient information if available. Set False for
             gradient-free optimization.
-            
+
         :param optimizer_kwargs: (*dict, optional, default={}*)
             Additional keyword arguments passed to the optimizer.
-            
+
         :param show_progress: (*bool, optional, default=True*)
             Whether to display progress bar during training.
-            
+
+        :param mode: (*str, optional, default="serial"*)
+            Training mode. Options:
+            - "serial": One acquisition point per iteration (original behavior).
+            - "hybrid": Each iteration evaluates 1 acquisition point plus n_bonus
+              random space-filling points in parallel, growing the training set
+              faster at constant wall-clock cost per iteration.
+
+        :param n_bonus: (*int, optional, default=0*)
+            Number of random bonus points per iteration (hybrid mode only).
+            Ignored when mode="serial". Set to ncore-1 to fully utilize
+            available CPU cores.
+
+        :param nrmse_target: (*float, optional, default=None*)
+            Early stopping threshold on Normalized Root Mean Squared Error
+            (NRMSE = 100 * sqrt(test_scaled_mse), in percent). Training halts
+            when NRMSE drops below this value. Requires test data to be set.
+            None disables early stopping. Works in both serial and hybrid modes.
+
         .. note::
-        
+
             Active learning algorithms have different purposes:
-            
+
             - **BAPE**: Best for uncertainty quantification and space-filling
-            - **Jones**: Best for finding likelihood maxima/minima (optimization)  
+            - **Jones**: Best for finding likelihood maxima/minima (optimization)
             - **Alternate**: Good balance for both exploration and exploitation
             - **AGP**: Another balanced approach
-            
+
             The method automatically handles GP re-training and hyperparameter optimization
             based on the specified frequency. Training data is accumulated in _theta and _y
             attributes.
-        
+
         .. code-block:: python
 
         Basic active learning with BAPE:
-        
+
         >>> sm.active_train(niter=50, algorithm="bape")
-        
+
         Optimization-focused active learning:
-        
+
         >>> sm.active_train(niter=30, algorithm="jones", gp_opt_freq=10)
-        
-        Balanced approach with frequent GP optimization:
-        
-        >>> sm.active_train(niter=40, algorithm="alternate", gp_opt_freq=5)
+
+        Hybrid active learning with 7 bonus points per iteration:
+
+        >>> sm.active_train(niter=200, mode="hybrid", n_bonus=7, nrmse_target=1.0)
         """
+
+        # Validate mode
+        mode = str(mode).lower()
+        if mode not in ("serial", "hybrid"):
+            raise ValueError(f"mode must be 'serial' or 'hybrid', got '{mode}'")
+        if mode == "hybrid" and n_bonus < 1:
+            raise ValueError(f"n_bonus must be >= 1 in hybrid mode, got {n_bonus}")
+        if mode == "serial" and n_bonus > 0:
+            import warnings
+            warnings.warn("n_bonus is ignored in serial mode", stacklevel=2)
 
         # Set algorithm
         self.algorithm = str(algorithm).lower()
@@ -1856,7 +1998,11 @@ class SurrogateModel(object):
             first_iter = self.training_results["iteration"][-1]
 
         if self.verbose:
-            print(f"Running {niter} active learning iterations using {self.algorithm}...")
+            if mode == "hybrid":
+                print(f"Running {niter} hybrid active learning iterations "
+                      f"({1 + n_bonus} points/iter) using {self.algorithm}...")
+            else:
+                print(f"Running {niter} active learning iterations using {self.algorithm}...")
 
         # Create iterator with or without progress bar based on show_progress parameter
         iterator = tqdm.tqdm(range(1, niter+1)) if show_progress else range(1, niter+1)
@@ -1870,18 +2016,42 @@ class SurrogateModel(object):
                 # Initialize to None so they are always defined after the loop
                 _theta_prop, _y_prop = None, None
 
-                try:
-                    # Find next training point! (always single-threaded)
-                    _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
-                except Exception as e:
-                    if self.show_warnings:
-                        print(f"Warning: find_next_point raised exception at iteration {ii}: {e}. Retrying.")
+                if mode == "serial":
+                    # Original serial path: find_next_point evaluates likelihood internally
+                    try:
+                        _theta_prop, _y_prop, opt_timing = self.find_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
+                    except Exception as e:
+                        if self.show_warnings:
+                            print(f"Warning: find_next_point raised exception at iteration {ii}: {e}. Retrying.")
+
+                else:
+                    # Hybrid path: propose acquisition point, generate bonus points, evaluate all in parallel
+                    try:
+                        thetaN, opt_timing = self._propose_next_point(nopt=nopt, optimizer_kwargs=optimizer_kwargs)
+                    except Exception as e:
+                        if self.show_warnings:
+                            print(f"Warning: _propose_next_point raised exception at iteration {ii}: {e}. Retrying.")
+                        attempts += 1
+                        continue
+
+                    theta_list = [thetaN]
+                    bonus_theta = self.prior_sampler(nsample=n_bonus, sampler="uniform")
+                    for jj in range(n_bonus):
+                        theta_list.append(bonus_theta[jj])
+
+                    try:
+                        _theta_prop, _y_prop = self._evaluate_and_integrate_points(theta_list)
+                    except Exception as e:
+                        if self.show_warnings:
+                            print(f"Warning: Likelihood evaluation failed at iteration {ii}: {e}. Retrying.")
+                        attempts += 1
+                        continue
 
                 if _theta_prop is None or _y_prop is None:
                     attempts += 1
                 else:
                     try:
-                        # Fit GP with new training point
+                        # Fit GP with new training point(s)
                         self.gp, fit_gp_timing = self._fit_gp(_theta=_theta_prop, _y=_y_prop, hyperparameters=self.gp.get_parameter_vector())
                         success = True
                     except Exception as e:
@@ -1892,11 +2062,11 @@ class SurrogateModel(object):
                 if attempts >= max_attempts:
                     raise RuntimeError(f"Failed to find a valid training point after {max_attempts} attempts. \
                                         Check your likelihood function and training data for issues or increase max_attempts.")
-                    
+
             # If proposed (theta, y) did not cause fitting issues, save to surrogate model obj
             self._theta = _theta_prop
             self._y = _y_prop
-            
+
             # Optimize GP?
             if (ii + first_iter) % self.gp_opt_freq == 0:
 
@@ -1912,10 +2082,10 @@ class SurrogateModel(object):
                     if self.show_warnings:
                         print(f"Warning: GP re-optimization at iteration {ii + first_iter} produced invalid GP: {e}. Reverting hyperparameters.")
                     self.gp.set_parameter_vector(prev_params)
-                
+
                 # record which iteration hyperparameters were optimized
                 self.training_results["gp_hyperparameter_opt_iteration"].append(ii + first_iter)
-                
+
                 if (save_progress == True) and (ii != 0):
                     self.save()
                     self.plot(plots=["gp_error", "gp_hyperparam"])
@@ -1923,14 +2093,14 @@ class SurrogateModel(object):
                         self.plot(plots=["gp_fit_2D"])
                     else:
                         self.plot(plots=["gp_train_scatter"])
-            
+
             # evaluate gp training error (scaled)
             try:
                 _ypred = self.gp.predict(_y_prop, _theta_prop, return_cov=False, return_var=False)
                 ypred = self.y_scaler.inverse_transform(_ypred.reshape(-1, 1)).flatten()
                 training_mse = np.mean((self.y() - ypred)**2)
                 training_scaled_mse = training_mse / np.var(self.y())
-                
+
                 # if hyperparameters were reoptimized, report train error
                 if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                     print("Train MSE:", training_mse)
@@ -1948,7 +2118,7 @@ class SurrogateModel(object):
                     ytest_true = self.y_scaler.inverse_transform(self._y_test.reshape(-1, 1)).flatten()
                     test_mse = np.mean((ytest_true - ytest)**2)
                     test_scaled_mse = test_mse / np.var(self.y())
-                    
+
                     # if hyperparameters were reoptimized, report test error
                     if ((ii + first_iter) % self.gp_opt_freq == 0) & self.verbose:
                         print("Test MSE:", test_mse)
@@ -1979,6 +2149,15 @@ class SurrogateModel(object):
             self.ntrain = len(self._theta)
             # number of active training samples
             self.nactive = self.ntrain - self.ninit_train
+
+            # early stopping on NRMSE
+            if nrmse_target is not None and not np.isnan(test_scaled_mse):
+                nrmse = 100.0 * np.sqrt(test_scaled_mse)
+                if nrmse < nrmse_target:
+                    if self.verbose:
+                        print(f"NRMSE {nrmse:.4f}% < target {nrmse_target}% at iteration "
+                              f"{ii + first_iter} ({self.ntrain} training points). Stopping.")
+                    break
 
         if self.cache:
             self.save()
