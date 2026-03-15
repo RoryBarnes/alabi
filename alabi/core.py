@@ -1375,7 +1375,7 @@ class SurrogateModel(object):
                 p0 = ut.prior_sampler(bounds=self.hp_bounds, nsample=self.gp_nopt, sampler="lhs", random_state=self.random_state)
                 p0[0] = current_hp
                 
-                if self.ncore <= 1:
+                if self.ncore <= 1 or not multi_proc:
                     # Sequential with progress bar
                     opt_results = [_optimize_fn(p) for p in tqdm.tqdm(p0, desc="Optimizing GP")]
                 else:
@@ -1823,12 +1823,14 @@ class SurrogateModel(object):
         return thetaN, opt_timing
 
 
-    def _evaluate_and_integrate_points(self, theta_list):
+    def _evaluate_and_integrate_points(self, theta_list, pool=None):
         """
         Evaluate likelihoods for proposed points in parallel and integrate valid
         results into the training data with a single scaler refit.
 
         :param theta_list: (*list*) List of 1D arrays, each an unscaled theta point.
+        :param pool: (*multiprocessing.Pool, optional*) Pre-created pool for
+            parallel evaluation.  When provided the caller owns the pool lifetime.
 
         :returns: (*tuple*) ``(_theta_prop, _y_prop)`` scaled arrays of all training
             data including new points, or ``(None, None)`` if no valid points.
@@ -1842,10 +1844,13 @@ class SurrogateModel(object):
             except Exception:
                 return np.nan
 
-        if n_points > 1 and self.ncore > 1:
-            pool = self._get_pool(ncore=min(n_points, self.ncore))
-            results = list(pool.map(safe_likelihood, theta_list))
-            self._close_pool(pool)
+        if n_points > 1 and (pool is not None or self.ncore > 1):
+            if pool is not None:
+                results = list(pool.map(safe_likelihood, theta_list))
+            else:
+                tmp_pool = self._get_pool(ncore=min(n_points, self.ncore))
+                results = list(tmp_pool.map(safe_likelihood, theta_list))
+                self._close_pool(tmp_pool)
         else:
             results = [safe_likelihood(t) for t in theta_list]
 
@@ -1878,7 +1883,7 @@ class SurrogateModel(object):
     def active_train(self, niter=100, algorithm="bape", gp_opt_freq=20, save_progress=False,
                      obj_opt_method="l-bfgs-b", nopt=5, optimizer_kwargs={}, use_grad_opt=True,
                      show_progress=True, allow_opt_multiproc=True, max_attempts=10,
-                     mode="serial", n_bonus=0, nrmse_target=None):
+                     mode="serial", n_bonus=0, nrmse_target=None, eval_pool=None):
         """
         Perform active learning to iteratively improve the surrogate model.
 
@@ -1941,6 +1946,13 @@ class SurrogateModel(object):
             (NRMSE = 100 * sqrt(test_scaled_mse), in percent). Training halts
             when NRMSE drops below this value. Requires test data to be set.
             None disables early stopping. Works in both serial and hybrid modes.
+
+        :param eval_pool: (*multiprocessing.Pool, optional, default=None*)
+            Pre-created multiprocessing pool for parallel likelihood evaluation
+            in hybrid mode. When provided, this pool is used instead of creating
+            a new one at each iteration, avoiding fork-after-BLAS deadlocks.
+            The caller is responsible for closing the pool after active_train
+            returns.
 
         .. note::
 
@@ -2006,7 +2018,7 @@ class SurrogateModel(object):
 
         # Create iterator with or without progress bar based on show_progress parameter
         iterator = tqdm.tqdm(range(1, niter+1)) if show_progress else range(1, niter+1)
-        
+
         for ii in iterator:
 
             attempts = 0
@@ -2040,7 +2052,7 @@ class SurrogateModel(object):
                         theta_list.append(bonus_theta[jj])
 
                     try:
-                        _theta_prop, _y_prop = self._evaluate_and_integrate_points(theta_list)
+                        _theta_prop, _y_prop = self._evaluate_and_integrate_points(theta_list, pool=eval_pool)
                     except Exception as e:
                         if self.show_warnings:
                             print(f"Warning: Likelihood evaluation failed at iteration {ii}: {e}. Retrying.")
@@ -2161,8 +2173,7 @@ class SurrogateModel(object):
 
         if self.cache:
             self.save()
-            
-            
+
     def active_train_parallel(self, niter=100, nchains=4, algorithm="bape", gp_opt_freq=20, 
                                    obj_opt_method="nelder-mead", nopt=1, 
                                    use_grad_opt=True, optimizer_kwargs={}, 
